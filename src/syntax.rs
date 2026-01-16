@@ -36,14 +36,15 @@ pub enum MLtLValue {
     Float(String, String), // 0.5 - we keep this as a string because we don't need to edit it
     Matrix(MLtMatrixAccess), // `z`
     StructMatrix(String, MLtMatrixAccess), // constants.z
-    InlineMatrix(Vec<MLtLValue>), // [0; 1; z]
+    InlineMatrix(Vec<MLtExpr>), // [0; 1; z]
     FunctionCall(String, Vec<MLtExpr>), // telling these from single access is impossible in matlab, list of params
 }
 
 #[derive(Clone, Debug)]
 pub enum MLtExpr {
-    Basic(MLtLValue), // lvalue
-    //Transposed(MLtLValue),                       // lvalue' // TODO - figure this out
+    Basic(MLtLValue),         // lvalue or lvalue'
+    Transposed(Box<MLtExpr>), // transposed will be parenthesized or lvalue
+    Parenthesized(Box<MLtExpr>),
     BinOp(Box<MLtExpr>, MLtBinOp, Box<MLtExpr>), // "lvalue + lvalue", or sub, mul, div
 }
 

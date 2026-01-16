@@ -60,7 +60,7 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFunction> {
             .then_ignore(kw("."))
             .then(mlt_matrix.clone())
             .map(|(struct_name, matrix)| MLtLValue::StructMatrix(struct_name.to_string(), matrix)),
-        mlt_lvalue
+        mlt_expr
             .clone()
             .separated_by(kw(";"))
             .collect()
@@ -69,12 +69,25 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFunction> {
         mlt_matrix.map(MLtLValue::Matrix),
     )));
 
-    mlt_expr.define(recursive(|_| {
-        let atom = mlt_lvalue.clone().map(MLtExpr::Basic);
+    mlt_expr.define({
+        let atom = choice((
+            mlt_expr
+                .clone()
+                .delimited_by(kw("("), kw(")"))
+                .map(|e| MLtExpr::Parenthesized(Box::new(e))),
+            mlt_lvalue.clone().map(MLtExpr::Basic),
+        ));
 
-        let mul_div = atom.clone().foldl(
+        let transposed_atom = choice((
+            atom.clone()
+                .then_ignore(kw("'"))
+                .map(|e| MLtExpr::Transposed(Box::new(e))),
+            atom,
+        ));
+
+        let mul_div = transposed_atom.clone().foldl(
             choice((kw("*").to(MLtBinOp::Mul), kw("/").to(MLtBinOp::Div)))
-                .then(atom)
+                .then(transposed_atom)
                 .repeated(),
             |l, (op, r)| MLtExpr::BinOp(Box::new(l), op, Box::new(r)),
         );
@@ -92,7 +105,7 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFunction> {
                 .repeated(),
             |l, (op, r)| MLtExpr::BinOp(Box::new(l), op, Box::new(r)),
         )
-    }));
+    });
 
     let mlt_assignment = mlt_lvalue
         .then_ignore(kw("="))

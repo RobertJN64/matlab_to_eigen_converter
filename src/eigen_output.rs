@@ -28,7 +28,7 @@ fn lvalue_to_cpp(lvalue: MLtLValue) -> String {
             "/* [ {} ] */",
             mlt_lvalues
                 .into_iter()
-                .map(|v| lvalue_to_cpp(v))
+                .map(|v| expr_to_cpp(v))
                 .collect::<Vec<_>>()
                 .join(", ")
         ),
@@ -59,6 +59,8 @@ fn binop_to_cpp(binop: MLtBinOp) -> &'static str {
 fn expr_to_cpp(expr: MLtExpr) -> String {
     match expr {
         MLtExpr::Basic(mlt_lvalue) => lvalue_to_cpp(mlt_lvalue),
+        MLtExpr::Transposed(mlt_expr) => format!("{}.tranpose()", expr_to_cpp(*mlt_expr)),
+        MLtExpr::Parenthesized(mlt_expr) => format!("({})", expr_to_cpp(*mlt_expr)),
         MLtExpr::BinOp(mlt_exprl, mlt_bin_op, mlt_exprr) => {
             format!(
                 "{} {} {}",
