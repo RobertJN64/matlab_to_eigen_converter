@@ -16,6 +16,27 @@ fn matrix_to_cpp(matrix: MLtMatrixAccess) -> String {
     }
 }
 
+fn function_call_to_cpp(function_name: String, function_params: Vec<MLtExpr>) -> String {
+    match function_name.as_str() {
+        "eye" => {
+            if let Some(MLtExpr::Basic(MLtLValue::Integer(n))) = function_params.get(0) {
+                format!("Matrix{}_{}::Identity()", n, n)
+            } else {
+                panic!("eye expects one integer argument");
+            }
+        }
+        _ => format!(
+            "{}({})",
+            function_name,
+            function_params
+                .into_iter()
+                .map(|p| expr_to_cpp(p))
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
+    }
+}
+
 fn lvalue_to_cpp(lvalue: MLtLValue) -> String {
     match lvalue {
         MLtLValue::Integer(val) => format!("{}", val),
@@ -33,15 +54,7 @@ fn lvalue_to_cpp(lvalue: MLtLValue) -> String {
                 .join(", ")
         ),
         MLtLValue::FunctionCall(function_name, function_params) => {
-            format!(
-                "{}({})",
-                function_name,
-                function_params
-                    .into_iter()
-                    .map(|p| expr_to_cpp(p))
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            )
+            function_call_to_cpp(function_name, function_params)
         }
     }
 }
@@ -52,6 +65,7 @@ fn binop_to_cpp(binop: MLtBinOp) -> &'static str {
         MLtBinOp::Sub => "-",
         MLtBinOp::Mul => "*",
         MLtBinOp::Div => "/",
+        MLtBinOp::Pow => "^",
         MLtBinOp::NotEqualTo => "!=",
     }
 }
@@ -72,17 +86,11 @@ fn expr_to_cpp(expr: MLtExpr) -> String {
     }
 }
 
-fn generate_output_for_assignment(assignment: MLtAssignment) -> String {
-    format!(
-        "{} = {};\n",
-        lvalue_to_cpp(assignment.lvalue),
-        expr_to_cpp(assignment.expr)
-    )
-}
-
 fn generate_output_for_statement(statement: MLtStatement) -> String {
     match statement {
-        MLtStatement::Assignment(mlt_assignment) => generate_output_for_assignment(mlt_assignment),
+        MLtStatement::Assignment(lvalue, expr) => {
+            format!("{} = {};\n", lvalue_to_cpp(lvalue), expr_to_cpp(expr))
+        }
         MLtStatement::Persistent(idents) => {
             format!(
                 "// the following vars are persistent: {}\n",
@@ -111,6 +119,7 @@ fn generate_output_for_statement_list(statement_list: Vec<MLtStatement>) -> Stri
         .collect()
 }
 
+// TODO - handle special functions
 fn generate_output_for_function(function: MLtFunction) -> String {
     format!(
         "void {}({}) {{\n{}return {};\n}}",

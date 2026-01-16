@@ -1,6 +1,6 @@
 #[derive(Clone, Debug)]
 pub struct MLtFunction {
-    pub return_obj: String,
+    pub return_obj: String, // TODO - multiple returns?
     pub name: String,
     pub params: Vec<String>,
     pub body: Vec<MLtStatement>,
@@ -8,30 +8,22 @@ pub struct MLtFunction {
 
 #[derive(Clone, Debug)]
 pub enum MLtStatement {
-    Assignment(MLtAssignment),
+    Assignment(MLtLValue, MLtExpr),
     Persistent(Vec<String>),                 // list of persistent variables
     IfStatement(MLtExpr, Vec<MLtStatement>), // condition, list of statements
-    Comment(String),
+    Comment(String), // TODO - would be nice to put inline comments back on the same line
     Error(String),
 }
 
 #[derive(Clone, Debug)]
-// matches `lvalue = expr;`
-pub struct MLtAssignment {
-    pub lvalue: MLtLValue,
-    pub expr: MLtExpr,
-}
-
-#[derive(Clone, Debug)]
 pub enum MLtMatrixAccess {
-    Matrix(String),
-    MatrixSegment(String, MLtRange),
-    MatrixBlock(String, MLtRange, MLtRange),
+    Matrix(String),                          // z
+    MatrixSegment(String, MLtRange),         // z(1:3)
+    MatrixBlock(String, MLtRange, MLtRange), // z(1:3, 4:5)
 }
 
 #[derive(Clone, Debug)]
 pub enum MLtLValue {
-    // TODO - consider breaking into postfix
     Integer(String), // 1 - we keep this as a string because we don't need to edit it
     Float(String, String), // 0.5 - we keep this as a string because we don't need to edit it
     Matrix(MLtMatrixAccess), // `z`
@@ -42,6 +34,7 @@ pub enum MLtLValue {
 
 #[derive(Clone, Debug)]
 pub enum MLtExpr {
+    // TODO - handle negation
     Basic(MLtLValue),         // lvalue or lvalue'
     Transposed(Box<MLtExpr>), // transposed will be parenthesized or lvalue
     Parenthesized(Box<MLtExpr>),
@@ -60,5 +53,6 @@ pub enum MLtBinOp {
     Sub,
     Mul,
     Div,
+    Pow,
     NotEqualTo,
 }

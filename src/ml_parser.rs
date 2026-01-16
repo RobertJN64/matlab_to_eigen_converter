@@ -6,22 +6,25 @@ fn kw<'src>(s: &'static str) -> impl Parser<'src, &'src str, ()> + Clone {
     just(s).padded().ignored()
 }
 
+// ident to string
+fn sident<'src>() -> impl Parser<'src, &'src str, String> + Clone {
+    ident().map(String::from)
+}
+
 pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFunction> {
     let mlt_range = int(10)
         .then_ignore(kw(":"))
         .then(int(10))
-        .map(|(start, end): (&str, &str)| MLtRange {
+        .map(|(start, end)| MLtRange {
             start: start.parse().expect("failed to parse output of int to int"),
             end: end.parse().expect("failed to parse output of int to int"),
         });
 
     let mlt_matrix = choice((
-        ident()
+        sident()
             .then(mlt_range.clone().delimited_by(kw("("), kw(")")))
-            .map(|(ident, pf): (&str, MLtRange)| {
-                MLtMatrixAccess::MatrixSegment(ident.to_string(), pf)
-            }),
-        ident()
+            .map(|(ident, pf)| MLtMatrixAccess::MatrixSegment(ident, pf)),
+        sident()
             .then(
                 mlt_range
                     .clone()
@@ -30,9 +33,9 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFunction> {
                     .delimited_by(kw("("), kw(")")),
             )
             .map(|(ident, (range_1, range_2))| {
-                MLtMatrixAccess::MatrixBlock(ident.to_string(), range_1, range_2)
+                MLtMatrixAccess::MatrixBlock(ident, range_1, range_2)
             }),
-        ident().map(|ident: &str| MLtMatrixAccess::Matrix(ident.to_string())),
+        sident().map(MLtMatrixAccess::Matrix),
     ));
 
     let mut mlt_lvalue = Recursive::declare();
@@ -45,7 +48,7 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFunction> {
             .then(int(10).map(String::from))
             .map(|(int_v, float_v)| MLtLValue::Float(int_v, float_v)),
         int(10).map(String::from).map(MLtLValue::Integer),
-        ident()
+        sident()
             .then(
                 mlt_expr
                     .clone()
@@ -53,19 +56,17 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFunction> {
                     .collect()
                     .delimited_by(kw("("), kw(")")),
             )
-            .map(|(function_name, params)| {
-                MLtLValue::FunctionCall(function_name.to_string(), params)
-            }),
-        ident()
+            .map(|(function_name, params)| MLtLValue::FunctionCall(function_name, params)),
+        sident()
             .then_ignore(kw("."))
             .then(mlt_matrix.clone())
-            .map(|(struct_name, matrix)| MLtLValue::StructMatrix(struct_name.to_string(), matrix)),
+            .map(|(struct_name, matrix)| MLtLValue::StructMatrix(struct_name, matrix)),
         mlt_expr
             .clone()
             .separated_by(kw(";"))
             .collect()
             .delimited_by(kw("["), kw("]"))
-            .map(|s| MLtLValue::InlineMatrix(s)),
+            .map(MLtLValue::InlineMatrix),
         mlt_matrix.map(MLtLValue::Matrix),
     )));
 
@@ -85,9 +86,14 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFunction> {
             atom,
         ));
 
-        let mul_div = transposed_atom.clone().foldl(
+        let exponents = transposed_atom.clone().foldl(
+            kw("^").to(MLtBinOp::Pow).then(transposed_atom).repeated(),
+            |l, (op, r)| MLtExpr::BinOp(Box::new(l), op, Box::new(r)),
+        );
+
+        let mul_div = exponents.clone().foldl(
             choice((kw("*").to(MLtBinOp::Mul), kw("/").to(MLtBinOp::Div)))
-                .then(transposed_atom)
+                .then(exponents)
                 .repeated(),
             |l, (op, r)| MLtExpr::BinOp(Box::new(l), op, Box::new(r)),
         );
@@ -110,13 +116,16 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFunction> {
     let mlt_assignment = mlt_lvalue
         .then_ignore(kw("="))
         .then(mlt_expr.clone())
-        .then_ignore(kw(";"))
-        .map(|(lvalue, expr)| MLtAssignment { lvalue, expr });
+        .then_ignore(kw(";"));
 
     let mut mlt_statement = Recursive::declare();
 
     mlt_statement.define(choice((
-        mlt_assignment.map(MLtStatement::Assignment),
+        mlt_assignment.map(|(lvalue, expr)| MLtStatement::Assignment(lvalue, expr)),
+        kw("persistent")
+            .ignore_then(none_of("\r\n").repeated().collect::<String>())
+            .padded()
+            .map(|s| MLtStatement::Persistent(s.split_whitespace().map(String::from).collect())),
         kw("if")
             .ignore_then(mlt_expr)
             .padded()
@@ -139,22 +148,22 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFunction> {
     )));
 
     let mlt_function_header = kw("function")
-        .ignore_then(ident())
+        .ignore_then(sident())
         .then_ignore(kw("="))
-        .then(ident())
+        .then(sident())
         .then(
-            ident()
-                .map(String::from)
+            sident()
                 .separated_by(kw(","))
                 .collect()
                 .delimited_by(kw("("), kw(")")),
         );
+
     let mlt_function = mlt_function_header
         .then(mlt_statement.repeated().collect())
         .then_ignore(kw("end"))
         .map(|(((return_obj, name), params), body)| MLtFunction {
-            return_obj: return_obj.to_string(),
-            name: name.to_string(),
+            return_obj,
+            name,
             params,
             body,
         });
