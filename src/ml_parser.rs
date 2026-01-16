@@ -48,6 +48,12 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, Vec<MLtStatement>> {
 
     let mlt_statement = choice((
         mlt_assignment.map(MLtStatement::Assignment),
+        kw("%")
+            .repeated()
+            .at_least(1)
+            .ignore_then(none_of("\r\n").repeated().collect::<String>())
+            .padded()
+            .map(MLtStatement::Comment),
         none_of(";")
             .repeated()
             .at_least(1)

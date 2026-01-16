@@ -10,6 +10,7 @@ pub struct MLtFunction {
 pub enum MLtStatement {
     Assignment(MLtAssignment),
     IfStatement(MLtExpr, Vec<MLtStatement>), // condition, list of statements
+    Comment(String),
     Error(String),
 }
 

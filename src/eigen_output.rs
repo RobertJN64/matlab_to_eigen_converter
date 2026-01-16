@@ -57,6 +57,7 @@ fn generate_output_for_statement(statement: MLtStatement) -> String {
                 generate_output_for_statement_list(mlt_statements)
             )
         }
+        MLtStatement::Comment(comment_str) => format!("// {}", comment_str),
         MLtStatement::Error(error_str) => {
             format!("// {}; // line could not be parsed\n", error_str)
         }
