@@ -15,6 +15,26 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFunction> {
             end: end.parse().expect("failed to parse output of int to int"),
         });
 
+    let mlt_matrix = choice((
+        ident()
+            .then(mlt_range.clone().delimited_by(kw("("), kw(")")))
+            .map(|(ident, pf): (&str, MLtRange)| {
+                MLtMatrixAccess::MatrixSegment(ident.to_string(), pf)
+            }),
+        ident()
+            .then(
+                mlt_range
+                    .clone()
+                    .then_ignore(kw(","))
+                    .then(mlt_range)
+                    .delimited_by(kw("("), kw(")")),
+            )
+            .map(|(ident, (range_1, range_2))| {
+                MLtMatrixAccess::MatrixBlock(ident.to_string(), range_1, range_2)
+            }),
+        ident().map(|ident: &str| MLtMatrixAccess::Matrix(ident.to_string())),
+    ));
+
     let mut mlt_lvalue = Recursive::declare();
     let mut mlt_expr = Recursive::declare();
 
@@ -26,26 +46,6 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFunction> {
             .map(|(int_v, float_v)| MLtLValue::Float(int_v, float_v)),
         int(10).map(String::from).map(MLtLValue::Integer),
         ident()
-            .then(mlt_range.clone().delimited_by(kw("("), kw(")")))
-            .map(|(ident, pf): (&str, MLtRange)| MLtLValue::MatrixSegment(ident.to_string(), pf)),
-        ident()
-            .then(
-                mlt_range
-                    .clone()
-                    .then_ignore(kw(","))
-                    .then(mlt_range)
-                    .delimited_by(kw("("), kw(")")),
-            )
-            .map(|(ident, (range_1, range_2))| {
-                MLtLValue::MatrixBlock(ident.to_string(), range_1, range_2)
-            }),
-        ident()
-            .then_ignore(kw("."))
-            .then(mlt_lvalue.clone())
-            .map(|(struct_name, lval)| {
-                MLtLValue::StructMatrix(struct_name.to_string(), Box::new(lval))
-            }),
-        ident()
             .then(
                 mlt_expr
                     .clone()
@@ -56,7 +56,17 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFunction> {
             .map(|(function_name, params)| {
                 MLtLValue::FunctionCall(function_name.to_string(), params)
             }),
-        ident().map(|ident: &str| MLtLValue::Matrix(ident.to_string())),
+        ident()
+            .then_ignore(kw("."))
+            .then(mlt_matrix.clone())
+            .map(|(struct_name, matrix)| MLtLValue::StructMatrix(struct_name.to_string(), matrix)),
+        mlt_lvalue
+            .clone()
+            .separated_by(kw(";"))
+            .collect()
+            .delimited_by(kw("["), kw("]"))
+            .map(|s| MLtLValue::InlineMatrix(s)),
+        mlt_matrix.map(MLtLValue::Matrix),
     )));
 
     mlt_expr.define(recursive(|_| {

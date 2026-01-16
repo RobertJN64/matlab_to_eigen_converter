@@ -1,23 +1,37 @@
 use crate::syntax::*;
 use std::{fs::File, io::Write};
 
-fn lvalue_to_cpp(lvalue: MLtLValue) -> String {
-    match lvalue {
-        MLtLValue::Integer(val) => format!("{}", val),
-        MLtLValue::Float(int_v, float_v) => format!("{}.{}", int_v, float_v),
-        MLtLValue::Matrix(ident) => ident,
-        MLtLValue::StructMatrix(struct_name, ident) => {
-            format!("{}.{}", struct_name, lvalue_to_cpp(*ident))
+fn matrix_to_cpp(matrix: MLtMatrixAccess) -> String {
+    match matrix {
+        MLtMatrixAccess::Matrix(ident) => ident,
+        MLtMatrixAccess::MatrixSegment(ident, mlt_range) => {
+            format!("{}.segment<>({}:{})", ident, mlt_range.start, mlt_range.end) // TODO - update these for C++
         }
-        MLtLValue::MatrixSegment(ident, mlt_range) => {
-            format!("{}({}:{})", ident, mlt_range.start, mlt_range.end) // TODO - update these for C++
-        }
-        MLtLValue::MatrixBlock(ident, mlt_range_l, mlt_range_r) => {
+        MLtMatrixAccess::MatrixBlock(ident, mlt_range_l, mlt_range_r) => {
             format!(
                 "{}({}:{}, {}:{})",
                 ident, mlt_range_l.start, mlt_range_l.end, mlt_range_r.start, mlt_range_r.end
             )
         }
+    }
+}
+
+fn lvalue_to_cpp(lvalue: MLtLValue) -> String {
+    match lvalue {
+        MLtLValue::Integer(val) => format!("{}", val),
+        MLtLValue::Float(int_v, float_v) => format!("{}.{}", int_v, float_v),
+        MLtLValue::Matrix(matrix) => matrix_to_cpp(matrix),
+        MLtLValue::StructMatrix(struct_name, matrix) => {
+            format!("{}.{}", struct_name, matrix_to_cpp(matrix))
+        }
+        MLtLValue::InlineMatrix(mlt_lvalues) => format!(
+            "/* [ {} ] */",
+            mlt_lvalues
+                .into_iter()
+                .map(|v| lvalue_to_cpp(v))
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
         MLtLValue::FunctionCall(function_name, function_params) => {
             format!(
                 "{}({})",
@@ -66,6 +80,12 @@ fn generate_output_for_assignment(assignment: MLtAssignment) -> String {
 fn generate_output_for_statement(statement: MLtStatement) -> String {
     match statement {
         MLtStatement::Assignment(mlt_assignment) => generate_output_for_assignment(mlt_assignment),
+        MLtStatement::Persistent(idents) => {
+            format!(
+                "// the following vars are persistent: {}\n",
+                idents.join(", ")
+            )
+        }
         MLtStatement::IfStatement(mlt_expr, mlt_statements) => {
             format!(
                 "if ({}) {{\n {} \n}}\n",

@@ -9,6 +9,7 @@ pub struct MLtFunction {
 #[derive(Clone, Debug)]
 pub enum MLtStatement {
     Assignment(MLtAssignment),
+    Persistent(Vec<String>),                 // list of persistent variables
     IfStatement(MLtExpr, Vec<MLtStatement>), // condition, list of statements
     Comment(String),
     Error(String),
@@ -22,20 +23,27 @@ pub struct MLtAssignment {
 }
 
 #[derive(Clone, Debug)]
+pub enum MLtMatrixAccess {
+    Matrix(String),
+    MatrixSegment(String, MLtRange),
+    MatrixBlock(String, MLtRange, MLtRange),
+}
+
+#[derive(Clone, Debug)]
 pub enum MLtLValue {
-    // TODO - do we need 1 and 2d access?
+    // TODO - consider breaking into postfix
     Integer(String), // 1 - we keep this as a string because we don't need to edit it
     Float(String, String), // 0.5 - we keep this as a string because we don't need to edit it
-    StructMatrix(String, Box<MLtLValue>), // constants.z
-    Matrix(String),  // `z`
-    MatrixSegment(String, MLtRange), // `z(1:3)`
-    MatrixBlock(String, MLtRange, MLtRange), // `z(1:3, 2:4)`
+    Matrix(MLtMatrixAccess), // `z`
+    StructMatrix(String, MLtMatrixAccess), // constants.z
+    InlineMatrix(Vec<MLtLValue>), // [0; 1; z]
     FunctionCall(String, Vec<MLtExpr>), // telling these from single access is impossible in matlab, list of params
 }
 
 #[derive(Clone, Debug)]
 pub enum MLtExpr {
-    Basic(MLtLValue),                            // lvalue
+    Basic(MLtLValue), // lvalue
+    //Transposed(MLtLValue),                       // lvalue' // TODO - figure this out
     BinOp(Box<MLtExpr>, MLtBinOp, Box<MLtExpr>), // "lvalue + lvalue", or sub, mul, div
 }
 
