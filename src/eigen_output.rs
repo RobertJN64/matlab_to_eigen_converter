@@ -1,5 +1,5 @@
 use crate::syntax::*;
-use std::{fs::File, io::Write};
+use std::{fmt::format, fs::File, io::Write};
 
 fn lvalue_to_cpp(lvalue: MLtLValue) -> String {
     match lvalue {
@@ -57,7 +57,7 @@ fn generate_output_for_statement(statement: MLtStatement) -> String {
                 generate_output_for_statement_list(mlt_statements)
             )
         }
-        MLtStatement::Comment(comment_str) => format!("// {}", comment_str),
+        MLtStatement::Comment(comment_str) => format!("// {}\n", comment_str),
         MLtStatement::Error(error_str) => {
             format!("// {}; // line could not be parsed\n", error_str)
         }
@@ -71,7 +71,17 @@ fn generate_output_for_statement_list(statement_list: Vec<MLtStatement>) -> Stri
         .collect()
 }
 
-pub fn generate_output_file(statement_list: Vec<MLtStatement>) {
+fn generate_output_for_function(function: MLtFunction) -> String {
+    format!(
+        "void {}({}) {{\n{}return {};\n}}",
+        function.name,
+        function.params.join(", "), // TODO - add in types
+        generate_output_for_statement_list(function.body),
+        function.return_obj
+    )
+}
+
+pub fn generate_output_file(function: MLtFunction) {
     let mut file = File::create("out.cpp").unwrap();
-    let _ = file.write_all(generate_output_for_statement_list(statement_list).as_bytes());
+    let _ = file.write_all(generate_output_for_function(function).as_bytes());
 }

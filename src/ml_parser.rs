@@ -6,7 +6,7 @@ fn kw<'src>(s: &'static str) -> impl Parser<'src, &'src str, ()> + Clone {
     just(s).padded().ignored()
 }
 
-pub fn parser<'src>() -> impl Parser<'src, &'src str, Vec<MLtStatement>> {
+pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFunction> {
     let mlt_range = int(10)
         .then_ignore(kw(":"))
         .then(int(10))
@@ -63,5 +63,28 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, Vec<MLtStatement>> {
             .map(MLtStatement::Error),
     ));
 
-    return mlt_statement.repeated().collect();
+    let mlt_function_header = kw("function")
+        .ignore_then(ident())
+        .then_ignore(kw("="))
+        .then(ident())
+        .then(
+            ident()
+                .map(String::from)
+                .separated_by(kw(","))
+                .collect()
+                .delimited_by(kw("("), kw(")")),
+        );
+    let mlt_function = mlt_function_header
+        .then(mlt_statement.repeated().collect())
+        .then_ignore(kw("end"))
+        .map(|(((return_obj, name), params), body)| MLtFunction {
+            return_obj: return_obj.to_string(),
+            name: name.to_string(),
+            params,
+            body,
+        });
+
+    //
+
+    return mlt_function;
 }
