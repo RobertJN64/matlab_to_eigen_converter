@@ -79,9 +79,16 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFunction> {
             |l, (op, r)| MLtExpr::BinOp(Box::new(l), op, Box::new(r)),
         );
 
-        mul_div.clone().foldl(
+        let add_sub = mul_div.clone().foldl(
             choice((kw("+").to(MLtBinOp::Add), kw("-").to(MLtBinOp::Sub)))
                 .then(mul_div)
+                .repeated(),
+            |l, (op, r)| MLtExpr::BinOp(Box::new(l), op, Box::new(r)),
+        );
+
+        add_sub.clone().foldl(
+            choice((kw("~=").to(MLtBinOp::NotEqualTo),))
+                .then(add_sub)
                 .repeated(),
             |l, (op, r)| MLtExpr::BinOp(Box::new(l), op, Box::new(r)),
         )
@@ -89,26 +96,34 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFunction> {
 
     let mlt_assignment = mlt_lvalue
         .then_ignore(kw("="))
-        .then(mlt_expr)
+        .then(mlt_expr.clone())
         .then_ignore(kw(";"))
         .map(|(lvalue, expr)| MLtAssignment { lvalue, expr });
 
-    let mlt_statement = choice((
+    let mut mlt_statement = Recursive::declare();
+
+    mlt_statement.define(choice((
         mlt_assignment.map(MLtStatement::Assignment),
+        kw("if")
+            .ignore_then(mlt_expr)
+            .padded()
+            .then(mlt_statement.clone().repeated().collect())
+            .then_ignore(kw("end"))
+            .map(|(cond, body)| MLtStatement::IfStatement(cond, body)),
         kw("%")
             .repeated()
             .at_least(1)
             .ignore_then(none_of("\r\n").repeated().collect::<String>())
             .padded()
             .map(MLtStatement::Comment),
-        none_of(";")
+        none_of(";\n")
             .repeated()
             .at_least(1)
             .collect::<String>()
             .then_ignore(just(';'))
             .padded()
             .map(MLtStatement::Error),
-    ));
+    )));
 
     let mlt_function_header = kw("function")
         .ignore_then(ident())

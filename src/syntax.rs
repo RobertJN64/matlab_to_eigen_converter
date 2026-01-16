@@ -59,4 +59,5 @@ pub enum MLtBinOp {
     Sub,
     Mul,
     Div,
+    NotEqualTo,
 }

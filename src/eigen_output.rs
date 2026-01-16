@@ -52,6 +52,7 @@ fn binop_to_cpp(binop: MLtBinOp) -> &'static str {
         MLtBinOp::Sub => "-",
         MLtBinOp::Mul => "*",
         MLtBinOp::Div => "/",
+        MLtBinOp::NotEqualTo => "!=",
     }
 }
 
