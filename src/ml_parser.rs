@@ -16,10 +16,16 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFunction> {
         });
 
     let mlt_lvalue = choice((
+        int(10)
+            .map(String::from)
+            .then_ignore(just("."))
+            .then(int(10).map(String::from))
+            .map(|(int_v, float_v)| MLtLValue::Float((int_v, float_v))),
+        int(10).map(String::from).map(MLtLValue::Integer),
         ident()
             .then(mlt_range.delimited_by(kw("("), kw(")")))
-            .map(|(ident, pf): (&str, MLtRange)| MLtLValue::Segment(ident.to_string(), pf)),
-        ident().map(|ident: &str| MLtLValue::Basic(ident.to_string())),
+            .map(|(ident, pf): (&str, MLtRange)| MLtLValue::MatrixSegment(ident.to_string(), pf)),
+        ident().map(|ident: &str| MLtLValue::Matrix(ident.to_string())),
     ));
 
     let mlt_expr = recursive(|_| {
@@ -83,8 +89,6 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFunction> {
             params,
             body,
         });
-
-    //
 
     return mlt_function;
 }

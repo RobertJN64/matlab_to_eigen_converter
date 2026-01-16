@@ -1,13 +1,15 @@
 use crate::syntax::*;
-use std::{fmt::format, fs::File, io::Write};
+use std::{fs::File, io::Write};
 
 fn lvalue_to_cpp(lvalue: MLtLValue) -> String {
     match lvalue {
-        MLtLValue::Basic(ident) => ident,
-        MLtLValue::Segment(ident, mlt_range) => {
+        MLtLValue::Integer(val) => format!("{}", val),
+        MLtLValue::Float((int_v, float_v)) => format!("{}.{}", int_v, float_v),
+        MLtLValue::Matrix(ident) => ident,
+        MLtLValue::MatrixSegment(ident, mlt_range) => {
             format!("{}({}:{})", ident, mlt_range.start, mlt_range.end) // TODO - update these for C++
         }
-        MLtLValue::Block(ident, mlt_range_l, mlt_range_r) => {
+        MLtLValue::MatrixBlock(ident, mlt_range_l, mlt_range_r) => {
             format!(
                 "{}({}:{}, {}:{})",
                 ident, mlt_range_l.start, mlt_range_l.end, mlt_range_r.start, mlt_range_r.end
@@ -59,6 +61,7 @@ fn generate_output_for_statement(statement: MLtStatement) -> String {
         }
         MLtStatement::Comment(comment_str) => format!("// {}\n", comment_str),
         MLtStatement::Error(error_str) => {
+            println!("Error line: {}", error_str);
             format!("// {}; // line could not be parsed\n", error_str)
         }
     }
