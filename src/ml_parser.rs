@@ -23,11 +23,28 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFunction> {
             .map(String::from)
             .then_ignore(just("."))
             .then(int(10).map(String::from))
-            .map(|(int_v, float_v)| MLtLValue::Float((int_v, float_v))),
+            .map(|(int_v, float_v)| MLtLValue::Float(int_v, float_v)),
         int(10).map(String::from).map(MLtLValue::Integer),
         ident()
-            .then(mlt_range.delimited_by(kw("("), kw(")")))
+            .then(mlt_range.clone().delimited_by(kw("("), kw(")")))
             .map(|(ident, pf): (&str, MLtRange)| MLtLValue::MatrixSegment(ident.to_string(), pf)),
+        ident()
+            .then(
+                mlt_range
+                    .clone()
+                    .then_ignore(kw(","))
+                    .then(mlt_range)
+                    .delimited_by(kw("("), kw(")")),
+            )
+            .map(|(ident, (range_1, range_2))| {
+                MLtLValue::MatrixBlock(ident.to_string(), range_1, range_2)
+            }),
+        ident()
+            .then_ignore(kw("."))
+            .then(mlt_lvalue.clone())
+            .map(|(struct_name, lval)| {
+                MLtLValue::StructMatrix(struct_name.to_string(), Box::new(lval))
+            }),
         ident()
             .then(
                 mlt_expr

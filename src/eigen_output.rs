@@ -4,8 +4,11 @@ use std::{fs::File, io::Write};
 fn lvalue_to_cpp(lvalue: MLtLValue) -> String {
     match lvalue {
         MLtLValue::Integer(val) => format!("{}", val),
-        MLtLValue::Float((int_v, float_v)) => format!("{}.{}", int_v, float_v),
+        MLtLValue::Float(int_v, float_v) => format!("{}.{}", int_v, float_v),
         MLtLValue::Matrix(ident) => ident,
+        MLtLValue::StructMatrix(struct_name, ident) => {
+            format!("{}.{}", struct_name, lvalue_to_cpp(*ident))
+        }
         MLtLValue::MatrixSegment(ident, mlt_range) => {
             format!("{}({}:{})", ident, mlt_range.start, mlt_range.end) // TODO - update these for C++
         }

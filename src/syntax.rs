@@ -25,7 +25,8 @@ pub struct MLtAssignment {
 pub enum MLtLValue {
     // TODO - do we need 1 and 2d access?
     Integer(String), // 1 - we keep this as a string because we don't need to edit it
-    Float((String, String)), // 0.5 - we keep this as a string because we don't need to edit it
+    Float(String, String), // 0.5 - we keep this as a string because we don't need to edit it
+    StructMatrix(String, Box<MLtLValue>), // constants.z
     Matrix(String),  // `z`
     MatrixSegment(String, MLtRange), // `z(1:3)`
     MatrixBlock(String, MLtRange, MLtRange), // `z(1:3, 2:4)`
