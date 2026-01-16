@@ -15,7 +15,10 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFunction> {
             end: end.parse().expect("failed to parse output of int to int"),
         });
 
-    let mlt_lvalue = choice((
+    let mut mlt_lvalue = Recursive::declare();
+    let mut mlt_expr = Recursive::declare();
+
+    mlt_lvalue.define(choice((
         int(10)
             .map(String::from)
             .then_ignore(just("."))
@@ -25,10 +28,21 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFunction> {
         ident()
             .then(mlt_range.delimited_by(kw("("), kw(")")))
             .map(|(ident, pf): (&str, MLtRange)| MLtLValue::MatrixSegment(ident.to_string(), pf)),
+        ident()
+            .then(
+                mlt_expr
+                    .clone()
+                    .separated_by(kw(","))
+                    .collect()
+                    .delimited_by(kw("("), kw(")")),
+            )
+            .map(|(function_name, params)| {
+                MLtLValue::FunctionCall(function_name.to_string(), params)
+            }),
         ident().map(|ident: &str| MLtLValue::Matrix(ident.to_string())),
-    ));
+    )));
 
-    let mlt_expr = recursive(|_| {
+    mlt_expr.define(recursive(|_| {
         let atom = mlt_lvalue.clone().map(MLtExpr::Basic);
 
         let mul_div = atom.clone().foldl(
@@ -44,7 +58,7 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFunction> {
                 .repeated(),
             |l, (op, r)| MLtExpr::BinOp(Box::new(l), op, Box::new(r)),
         )
-    });
+    }));
 
     let mlt_assignment = mlt_lvalue
         .then_ignore(kw("="))

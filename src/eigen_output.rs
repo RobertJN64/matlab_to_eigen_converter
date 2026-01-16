@@ -15,6 +15,17 @@ fn lvalue_to_cpp(lvalue: MLtLValue) -> String {
                 ident, mlt_range_l.start, mlt_range_l.end, mlt_range_r.start, mlt_range_r.end
             )
         }
+        MLtLValue::FunctionCall(function_name, function_params) => {
+            format!(
+                "{}({})",
+                function_name,
+                function_params
+                    .into_iter()
+                    .map(|p| expr_to_cpp(p))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )
+        }
     }
 }
 
