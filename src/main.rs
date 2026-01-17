@@ -2,10 +2,12 @@ use chumsky::prelude::*;
 use eigen_output::generate_output_file;
 use ml_parser::parser;
 use std::{env, fs};
+use transform::transform_ast;
 
 mod eigen_output;
 mod ml_parser;
 mod syntax;
+mod transform;
 
 fn main() {
     let src = fs::read_to_string(env::args().nth(1).expect("Expected file argument"))
@@ -15,6 +17,7 @@ fn main() {
     match ast {
         Some(ast) => {
             println!("{ast:#?}");
+            let ast = transform_ast(ast);
             generate_output_file(ast);
         }
         None => {

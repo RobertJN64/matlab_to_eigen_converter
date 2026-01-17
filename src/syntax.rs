@@ -13,6 +13,7 @@ pub enum MLtStatement {
     IfStatement(MLtExpr, Vec<MLtStatement>), // condition, list of statements
     Comment(String), // TODO - would be nice to put inline comments back on the same line
     Error(String),
+    Normalization(String), // not parsed in, detected in transform pass
 }
 
 #[derive(Clone, Debug)]
@@ -54,5 +55,8 @@ pub enum MLtBinOp {
     Mul,
     Div,
     Pow,
+    And,
+    Or,
+    EqualTo,
     NotEqualTo,
 }

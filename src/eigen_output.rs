@@ -5,12 +5,24 @@ fn matrix_to_cpp(matrix: MLtMatrixAccess) -> String {
     match matrix {
         MLtMatrixAccess::Matrix(ident) => ident,
         MLtMatrixAccess::MatrixSegment(ident, mlt_range) => {
-            format!("{}.segment<>({}:{})", ident, mlt_range.start, mlt_range.end) // TODO - update these for C++
+            let range_width = mlt_range.end - mlt_range.start + 1;
+            format!(
+                "{}.segment<{}>({})",
+                ident,
+                range_width,
+                mlt_range.start - 1
+            ) // TODO - update these for C++
         }
         MLtMatrixAccess::MatrixBlock(ident, mlt_range_l, mlt_range_r) => {
+            let range_width_l = mlt_range_l.end - mlt_range_l.start + 1;
+            let range_width_r = mlt_range_r.end - mlt_range_r.start + 1;
             format!(
-                "{}({}:{}, {}:{})",
-                ident, mlt_range_l.start, mlt_range_l.end, mlt_range_r.start, mlt_range_r.end
+                "{}.block<{}, {}>({}, {})",
+                ident,
+                range_width_l,
+                range_width_r,
+                mlt_range_l.start - 1,
+                mlt_range_r.start - 1
             )
         }
     }
@@ -66,6 +78,9 @@ fn binop_to_cpp(binop: MLtBinOp) -> &'static str {
         MLtBinOp::Mul => "*",
         MLtBinOp::Div => "/",
         MLtBinOp::Pow => "^",
+        MLtBinOp::And => "&&",
+        MLtBinOp::Or => "||",
+        MLtBinOp::EqualTo => "==",
         MLtBinOp::NotEqualTo => "!=",
     }
 }
@@ -73,7 +88,7 @@ fn binop_to_cpp(binop: MLtBinOp) -> &'static str {
 fn expr_to_cpp(expr: MLtExpr) -> String {
     match expr {
         MLtExpr::Basic(mlt_lvalue) => lvalue_to_cpp(mlt_lvalue),
-        MLtExpr::Transposed(mlt_expr) => format!("{}.tranpose()", expr_to_cpp(*mlt_expr)),
+        MLtExpr::Transposed(mlt_expr) => format!("{}.transpose()", expr_to_cpp(*mlt_expr)),
         MLtExpr::Parenthesized(mlt_expr) => format!("({})", expr_to_cpp(*mlt_expr)),
         MLtExpr::BinOp(mlt_exprl, mlt_bin_op, mlt_exprr) => {
             format!(
@@ -90,6 +105,9 @@ fn generate_output_for_statement(statement: MLtStatement) -> String {
     match statement {
         MLtStatement::Assignment(lvalue, expr) => {
             format!("{} = {};\n", lvalue_to_cpp(lvalue), expr_to_cpp(expr))
+        }
+        MLtStatement::Normalization(matrix_name) => {
+            format!("{}.normalize();\n", matrix_name)
         }
         MLtStatement::Persistent(idents) => {
             format!(

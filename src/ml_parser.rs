@@ -105,9 +105,20 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFunction> {
             |l, (op, r)| MLtExpr::BinOp(Box::new(l), op, Box::new(r)),
         );
 
-        add_sub.clone().foldl(
-            choice((kw("~=").to(MLtBinOp::NotEqualTo),))
-                .then(add_sub)
+        let comparison = add_sub.clone().foldl(
+            choice((
+                kw("~=").to(MLtBinOp::NotEqualTo),
+                kw("==").to(MLtBinOp::EqualTo),
+            ))
+            .then(add_sub)
+            .repeated(),
+            |l, (op, r)| MLtExpr::BinOp(Box::new(l), op, Box::new(r)),
+        );
+
+        // logical ops
+        comparison.clone().foldl(
+            choice((kw("&&").to(MLtBinOp::And), kw("||").to(MLtBinOp::Or)))
+                .then(comparison)
                 .repeated(),
             |l, (op, r)| MLtExpr::BinOp(Box::new(l), op, Box::new(r)),
         )
