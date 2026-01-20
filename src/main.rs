@@ -8,6 +8,7 @@ mod eigen_output;
 mod ml_parser;
 mod syntax;
 mod transform;
+mod type_inference;
 
 fn main() {
     let src = fs::read_to_string(env::args().nth(1).expect("Expected file argument"))

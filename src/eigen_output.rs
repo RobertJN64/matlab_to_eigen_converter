@@ -1,5 +1,14 @@
 use crate::syntax::*;
+use crate::type_inference::expr_type;
 use std::{fs::File, io::Write};
+
+fn type_to_cpp((rows, cols): (u32, u32)) -> String {
+    match (rows, cols) {
+        (1, 1) => "float".to_string(),
+        (rows, 1) => format!("Vector{}", rows),
+        (rows, cols) => format!("Matrix{}_{}", rows, cols),
+    }
+}
 
 fn matrix_to_cpp(matrix: MLtMatrixAccess) -> String {
     match matrix {
@@ -32,10 +41,21 @@ fn function_call_to_cpp(function_name: String, function_params: Vec<MLtExpr>) ->
     match function_name.as_str() {
         "eye" => {
             if let Some(MLtExpr::Basic(MLtLValue::Integer(n))) = function_params.get(0) {
-                format!("Matrix{}_{}::Identity()", n, n)
+                let n = n.parse().expect("Argument to eye must be an int");
+                format!("{}::Identity()", type_to_cpp((n, n)))
             } else {
                 panic!("eye expects one integer argument");
             }
+        }
+        "zeros" => {
+            if let Some(MLtExpr::Basic(MLtLValue::Integer(rows))) = function_params.get(0) {
+                if let Some(MLtExpr::Basic(MLtLValue::Integer(cols))) = function_params.get(1) {
+                    let rows = rows.parse().expect("Argument to zeros must be an int");
+                    let cols = cols.parse().expect("Argument to zeros must be an int");
+                    return format!("{}::Zero()", type_to_cpp((rows, cols)));
+                }
+            }
+            panic!("zeros expects two integer arguments");
         }
         _ => format!(
             "{}({})",
@@ -101,10 +121,40 @@ fn expr_to_cpp(expr: MLtExpr) -> String {
     }
 }
 
+fn matrix_access_should_have_type(matrix: &MLtMatrixAccess) -> bool {
+    match matrix {
+        MLtMatrixAccess::Matrix(_) => true,
+        MLtMatrixAccess::MatrixSegment(_, _) => false,
+        MLtMatrixAccess::MatrixBlock(_, _, _) => false,
+    }
+}
+
+fn lvalue_should_have_type(lvalve: &MLtLValue) -> bool {
+    match lvalve {
+        MLtLValue::Integer(_) => false,
+        MLtLValue::Float(_, _) => false,
+        MLtLValue::Matrix(mlt_matrix_access) => matrix_access_should_have_type(mlt_matrix_access),
+        MLtLValue::StructMatrix(_, mlt_matrix_access) => {
+            matrix_access_should_have_type(mlt_matrix_access)
+        }
+        MLtLValue::InlineMatrix(_) => false,
+        MLtLValue::FunctionCall(_, _) => false,
+    }
+}
+
 fn generate_output_for_statement(statement: MLtStatement) -> String {
     match statement {
         MLtStatement::Assignment(lvalue, expr) => {
-            format!("{} = {};\n", lvalue_to_cpp(lvalue), expr_to_cpp(expr))
+            if lvalue_should_have_type(&lvalue) {
+                format!(
+                    "{} {} = {};\n",
+                    type_to_cpp(expr_type(&expr)),
+                    lvalue_to_cpp(lvalue),
+                    expr_to_cpp(expr)
+                )
+            } else {
+                format!("{} = {};\n", lvalue_to_cpp(lvalue), expr_to_cpp(expr))
+            }
         }
         MLtStatement::Normalization(matrix_name) => {
             format!("{}.normalize();\n", matrix_name)
