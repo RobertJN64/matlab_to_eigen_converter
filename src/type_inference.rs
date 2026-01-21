@@ -37,6 +37,9 @@ fn matrix_type(
             }
         }
         MLtMatrixAccess::MatrixSegment(_, mlt_range) => (mlt_range.end - mlt_range.start + 1, 1),
+        MLtMatrixAccess::MatrixMultiSegment(_, _) => {
+            panic!("MatrixMultiSegment should be converted to an inline matrix")
+        }
         MLtMatrixAccess::MatrixBlock(_, rows, cols) => {
             (rows.end - rows.start + 1, cols.end - cols.start + 1)
         }

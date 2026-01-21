@@ -18,9 +18,10 @@ pub enum MLtStatement {
 
 #[derive(Clone, Debug)]
 pub enum MLtMatrixAccess {
-    Matrix(String),                          // z
-    MatrixSegment(String, MLtRange),         // z(1:3)
-    MatrixBlock(String, MLtRange, MLtRange), // z(1:3, 4:5)
+    Matrix(String),                            // z
+    MatrixSegment(String, MLtRange),           // z(1:3)
+    MatrixMultiSegment(String, Vec<MLtRange>), // z([1:3 7:9])
+    MatrixBlock(String, MLtRange, MLtRange),   // z(1:3, 4:5)
 }
 
 #[derive(Clone, Debug)]

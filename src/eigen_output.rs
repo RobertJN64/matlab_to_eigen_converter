@@ -23,6 +23,9 @@ fn matrix_to_cpp(matrix: MLtMatrixAccess) -> String {
                 mlt_range.start - 1
             ) // TODO - update these for C++
         }
+        MLtMatrixAccess::MatrixMultiSegment(_, _) => {
+            panic!("MatrixMultiSegment should be converted to an inline matrix")
+        }
         MLtMatrixAccess::MatrixBlock(ident, mlt_range_l, mlt_range_r) => {
             let range_width_l = mlt_range_l.end - mlt_range_l.start + 1;
             let range_width_r = mlt_range_r.end - mlt_range_r.start + 1;
@@ -180,6 +183,7 @@ fn matrix_access_should_have_type(matrix: &MLtMatrixAccess) -> bool {
     match matrix {
         MLtMatrixAccess::Matrix(_) => true,
         MLtMatrixAccess::MatrixSegment(_, _) => false,
+        MLtMatrixAccess::MatrixMultiSegment(_, _) => false,
         MLtMatrixAccess::MatrixBlock(_, _, _) => false,
     }
 }

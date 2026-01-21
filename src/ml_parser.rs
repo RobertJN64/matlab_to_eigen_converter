@@ -28,6 +28,15 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFunction> {
             .then(
                 mlt_range
                     .clone()
+                    .separated_by(just(" "))
+                    .collect()
+                    .delimited_by(kw("(["), kw("])")),
+            )
+            .map(|(ident, pf)| MLtMatrixAccess::MatrixMultiSegment(ident, pf)),
+        sident()
+            .then(
+                mlt_range
+                    .clone()
                     .then_ignore(kw(","))
                     .then(mlt_range)
                     .delimited_by(kw("("), kw(")")),
