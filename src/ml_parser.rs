@@ -43,10 +43,13 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFunction> {
 
     mlt_lvalue.define(choice((
         int(10)
-            .map(String::from)
             .then_ignore(just("."))
-            .then(int(10).map(String::from))
-            .map(|(int_v, float_v)| MLtLValue::Float(int_v, float_v)),
+            .then(int(10))
+            .map(|(int_v, float_v)| MLtLValue::Float(format!("{}.{}", int_v, float_v))),
+        int(10)
+            .then_ignore(just("e"))
+            .then(int(10))
+            .map(|(int_v, exp_v)| MLtLValue::Float(format!("{}e{}", int_v, exp_v))),
         int(10).map(String::from).map(MLtLValue::Integer),
         sident()
             .then(
