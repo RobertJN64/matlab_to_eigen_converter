@@ -6,6 +6,11 @@ fn kw<'src>(s: &'static str) -> impl Parser<'src, &'src str, ()> + Clone {
     just(s).padded().ignored()
 }
 
+// detects newline as its own line type - makes output cleaner
+fn kw_no_newline<'src>(s: &'static str) -> impl Parser<'src, &'src str, ()> + Clone {
+    just(s).padded_by(text::inline_whitespace()).ignored()
+}
+
 // ident to string
 fn sident<'src>() -> impl Parser<'src, &'src str, String> + Clone {
     ident().map(String::from)
@@ -139,27 +144,28 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFunction> {
     let mlt_assignment = mlt_lvalue
         .then_ignore(kw("="))
         .then(mlt_expr.clone())
-        .then_ignore(kw(";"));
+        .then_ignore(kw_no_newline(";"));
 
     let mut mlt_statement = Recursive::declare();
 
     mlt_statement.define(choice((
         mlt_assignment.map(|(lvalue, expr)| MLtStatement::Assignment(lvalue, expr)),
-        kw("persistent")
+        kw_no_newline("\r\n").to(MLtStatement::NewLine),
+        kw_no_newline("\n").to(MLtStatement::NewLine),
+        kw_no_newline("persistent")
             .ignore_then(none_of("\r\n").repeated().collect::<String>())
             .padded()
             .map(|s| MLtStatement::Persistent(s.split_whitespace().map(String::from).collect())),
-        kw("if")
+        kw_no_newline("if")
             .ignore_then(mlt_expr)
-            .padded()
+            .padded_by(text::whitespace())
             .then(mlt_statement.clone().repeated().collect())
-            .then_ignore(kw("end"))
+            .then_ignore(kw_no_newline("end"))
             .map(|(cond, body)| MLtStatement::IfStatement(cond, body)),
-        kw("%")
+        kw_no_newline("%")
             .repeated()
             .at_least(1)
             .ignore_then(none_of("\r\n").repeated().collect::<String>())
-            .padded()
             .map(MLtStatement::Comment),
         none_of(";\n")
             .repeated()
@@ -178,7 +184,7 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFunction> {
             sident()
                 .separated_by(kw(","))
                 .collect()
-                .delimited_by(kw("("), kw(")")),
+                .delimited_by(kw("("), kw_no_newline(")")),
         );
 
     let mlt_function = mlt_function_header

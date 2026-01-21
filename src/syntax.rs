@@ -11,8 +11,9 @@ pub enum MLtStatement {
     Assignment(MLtLValue, MLtExpr),
     Persistent(Vec<String>),                 // list of persistent variables
     IfStatement(MLtExpr, Vec<MLtStatement>), // condition, list of statements
-    Comment(String), // TODO - would be nice to put inline comments back on the same line
+    Comment(String),
     Error(String),
+    NewLine,
     Normalization(String), // not parsed in, detected in transform pass
 }
 

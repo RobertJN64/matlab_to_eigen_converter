@@ -1,7 +1,12 @@
 use chumsky::prelude::*;
 use eigen_output::generate_output_file;
 use ml_parser::parser;
-use std::{collections::HashMap, env, fs};
+use std::{
+    collections::HashMap,
+    env,
+    fs::{self, File},
+    io::Write,
+};
 use transform::transform_ast;
 
 mod eigen_output;
@@ -21,6 +26,7 @@ fn main() {
             ("quatRot", (3, 3)),
             ("StateTransitionMat", (12, 12)),
             ("HamiltonianProd", (4, 4)),
+            ("zetaCross", (3, 3)),
             ("expm", (12, 12)), // matrixExpPade6
             ("GND", (1, 1)),
             ("dT", (1, 1)),
@@ -35,10 +41,13 @@ fn main() {
         .map(|(name, (rows, cols))| (name.to_string(), (rows, cols))),
     );
 
+    // TODO - handle persistence
+
     let (ast, err) = parser().parse(src.trim()).into_output_errors();
     match ast {
         Some(ast) => {
-            println!("{ast:#?}");
+            let mut file = File::create("out.dbg").unwrap();
+            let _ = file.write_all(format!("{ast:#?}").as_bytes());
             let ast = transform_ast(ast);
             generate_output_file(ast, &mut ti_state);
         }
