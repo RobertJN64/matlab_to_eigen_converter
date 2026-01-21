@@ -37,8 +37,8 @@ pub enum MLtLValue {
 
 #[derive(Clone, Debug)]
 pub enum MLtExpr {
-    // TODO - handle negation
-    Basic(MLtLValue),         // lvalue or lvalue'
+    Basic(MLtLValue), // lvalue or lvalue'
+    Negation(Box<MLtExpr>),
     Transposed(Box<MLtExpr>), // transposed will be parenthesized or lvalue
     Parenthesized(Box<MLtExpr>),
     BinOp(Box<MLtExpr>, MLtBinOp, Box<MLtExpr>), // "lvalue + lvalue", or sub, mul, div

@@ -43,6 +43,7 @@ pub fn transform_matrix_multisegment(lvalue: MLtLValue) -> MLtLValue {
 pub fn transform_expression(expr: MLtExpr) -> MLtExpr {
     match expr {
         MLtExpr::Basic(mlt_lvalue) => MLtExpr::Basic(transform_matrix_multisegment(mlt_lvalue)),
+        MLtExpr::Negation(mlt_expr) => MLtExpr::Negation(Box::new(transform_expression(*mlt_expr))),
         MLtExpr::Transposed(mlt_expr) => {
             MLtExpr::Transposed(Box::new(transform_expression(*mlt_expr)))
         }

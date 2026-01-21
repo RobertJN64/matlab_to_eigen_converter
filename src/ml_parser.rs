@@ -96,11 +96,19 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFunction> {
             mlt_lvalue.clone().map(MLtExpr::Basic),
         ));
 
+        let negated_atom = choice((
+            kw("-")
+                .ignore_then(atom.clone())
+                .map(|e| MLtExpr::Negation(Box::new(e))),
+            atom,
+        ));
+
         let transposed_atom = choice((
-            atom.clone()
+            negated_atom
+                .clone()
                 .then_ignore(kw("'"))
                 .map(|e| MLtExpr::Transposed(Box::new(e))),
-            atom,
+            negated_atom,
         ));
 
         let exponents = transposed_atom.clone().foldl(

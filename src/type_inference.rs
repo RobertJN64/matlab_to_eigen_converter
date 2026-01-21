@@ -111,6 +111,7 @@ pub fn expr_type(
 ) -> (u32, u32) {
     match expr {
         MLtExpr::Basic(mlt_lvalue) => lvalue_type(mlt_lvalue, ti_state, line_num),
+        MLtExpr::Negation(mlt_expr) => expr_type(mlt_expr, ti_state, line_num),
         MLtExpr::Transposed(mlt_expr) => {
             let (cols, rows) = expr_type(mlt_expr, ti_state, line_num);
             (rows, cols) // transpose reverses the order

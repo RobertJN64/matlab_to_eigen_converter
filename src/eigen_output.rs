@@ -151,6 +151,9 @@ fn expr_to_cpp(
 ) -> String {
     match expr {
         MLtExpr::Basic(mlt_lvalue) => lvalue_to_cpp(mlt_lvalue, ti_state, line_num),
+        MLtExpr::Negation(mlt_expr) => {
+            format!("-{}", expr_to_cpp(*mlt_expr, ti_state, line_num))
+        }
         MLtExpr::Transposed(mlt_expr) => {
             format!("{}.transpose()", expr_to_cpp(*mlt_expr, ti_state, line_num))
         }

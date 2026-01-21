@@ -42,8 +42,6 @@ fn main() {
         .map(|(name, (rows, cols))| (name.to_string(), (rows, cols))),
     );
 
-    // TODO - handle persistence
-
     let (ast, err) = parser().parse(src.trim()).into_output_errors();
     match ast {
         Some(ast) => {
