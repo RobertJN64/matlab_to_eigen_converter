@@ -79,9 +79,20 @@ pub fn lvalue_type(
                         let rows = rows.parse().expect("Argument to ones|zeros must be an int");
                         let cols = cols.parse().expect("Argument to ones|zeros must be an int");
                         return (rows, cols);
+                    } else {
+                        let rows_cols =
+                            rows.parse().expect("Argument to ones|zeros must be an int");
+                        return (rows_cols, rows_cols);
                     }
                 }
                 panic!("ones|zeros expects two integer arguments");
+            }
+            "expm" => {
+                if let Some(expr) = function_params.get(0) {
+                    let (rows, cols) = expr_type(expr, ti_state, line_num);
+                    return (rows, cols);
+                }
+                panic!("expm expects one matrix argument");
             }
             "diag" => {
                 if let Some(expr) = function_params.get(0) {
@@ -169,6 +180,10 @@ pub fn expr_type(
                 MLtBinOp::Pow => expr_type(left, ti_state, line_num),
                 MLtBinOp::And | MLtBinOp::Or => (1, 1), // float is basically a bool - TODO - check that inputs are bools
                 MLtBinOp::EqualTo | MLtBinOp::NotEqualTo => (1, 1), // float is basically a bool - TODO - check that input shapes match
+                MLtBinOp::LessThan
+                | MLtBinOp::LessThanEqualTo
+                | MLtBinOp::GreaterThan
+                | MLtBinOp::GreaterThanEqualTo => (1, 1),
             }
         }
     }

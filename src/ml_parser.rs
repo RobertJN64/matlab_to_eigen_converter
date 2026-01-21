@@ -134,6 +134,10 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFunction> {
             choice((
                 kw("~=").to(MLtBinOp::NotEqualTo),
                 kw("==").to(MLtBinOp::EqualTo),
+                kw("<=").to(MLtBinOp::LessThanEqualTo),
+                kw("<").to(MLtBinOp::LessThan),
+                kw(">=").to(MLtBinOp::GreaterThanEqualTo),
+                kw(">").to(MLtBinOp::GreaterThan),
             ))
             .then(add_sub)
             .repeated(),
@@ -166,7 +170,7 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFunction> {
             .map(|s| MLtStatement::Persistent(s.split_whitespace().map(String::from).collect())),
         kw_no_newline("if")
             .ignore_then(mlt_expr)
-            .padded_by(text::whitespace())
+            .padded_by(text::inline_whitespace())
             .then(mlt_statement.clone().repeated().collect())
             .then_ignore(kw_no_newline("end"))
             .map(|(cond, body)| MLtStatement::IfStatement(cond, body)),
@@ -180,7 +184,7 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFunction> {
             .at_least(1)
             .collect::<String>()
             .then_ignore(just(';'))
-            .padded()
+            .padded_by(text::inline_whitespace())
             .map(MLtStatement::Error),
     )));
 

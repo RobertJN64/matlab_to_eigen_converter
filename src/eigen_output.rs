@@ -62,6 +62,9 @@ fn function_call_to_cpp(
                     let rows = rows.parse().expect("Argument to zeros must be an int");
                     let cols = cols.parse().expect("Argument to zeros must be an int");
                     return format!("{}::Zero()", type_to_cpp((rows, cols)));
+                } else {
+                    let rows_cols = rows.parse().expect("Argument to zeros must be an int");
+                    return format!("{}::Zero()", type_to_cpp((rows_cols, rows_cols)));
                 }
             }
             panic!("zeros expects two integer arguments");
@@ -72,6 +75,9 @@ fn function_call_to_cpp(
                     let rows = rows.parse().expect("Argument to ones must be an int");
                     let cols = cols.parse().expect("Argument to ones must be an int");
                     return format!("{}::Ones()", type_to_cpp((rows, cols)));
+                } else {
+                    let rows_cols = rows.parse().expect("Argument to ones must be an int");
+                    return format!("{}::Ones()", type_to_cpp((rows_cols, rows_cols)));
                 }
             }
             panic!("ones expects two integer arguments");
@@ -141,6 +147,10 @@ fn binop_to_cpp(binop: MLtBinOp) -> &'static str {
         MLtBinOp::Or => "||",
         MLtBinOp::EqualTo => "==",
         MLtBinOp::NotEqualTo => "!=",
+        MLtBinOp::LessThan => "<",
+        MLtBinOp::LessThanEqualTo => "<=",
+        MLtBinOp::GreaterThan => ">",
+        MLtBinOp::GreaterThanEqualTo => ">=",
     }
 }
 

@@ -61,4 +61,8 @@ pub enum MLtBinOp {
     Or,
     EqualTo,
     NotEqualTo,
+    LessThan,
+    LessThanEqualTo,
+    GreaterThan,
+    GreaterThanEqualTo,
 }
