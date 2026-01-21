@@ -57,7 +57,10 @@ pub fn transform_expression(expr: MLtExpr) -> MLtExpr {
     }
 }
 
-fn transform_statement(statement: MLtStatement) -> MLtStatement {
+fn transform_statement(
+    statement: MLtStatement,
+    persistent_params: &mut Vec<String>,
+) -> MLtStatement {
     if let MLtStatement::Assignment(
         MLtLValue::Matrix(MLtMatrixAccess::Matrix(target)),
         MLtExpr::BinOp(dividend_expr, MLtBinOp::Div, r_expr),
@@ -80,7 +83,9 @@ fn transform_statement(statement: MLtStatement) -> MLtStatement {
     if let MLtStatement::IfStatement(expr, body) = statement {
         return MLtStatement::IfStatement(
             expr,
-            body.into_iter().map(transform_statement).collect(),
+            body.into_iter()
+                .map(|s| transform_statement(s, persistent_params))
+                .collect(),
         );
     }
 
@@ -91,11 +96,21 @@ fn transform_statement(statement: MLtStatement) -> MLtStatement {
         );
     }
 
+    if let MLtStatement::Persistent(new_persis_params) = statement.clone() {
+        persistent_params.extend(new_persis_params.into_iter().map(|s| format!("&{}", s)));
+    }
+
     statement
 }
 
 pub fn transform_ast(mut function: MLtFunction) -> MLtFunction {
-    function.body = function.body.into_iter().map(transform_statement).collect();
+    let mut persistent_params = vec![];
+    function.body = function
+        .body
+        .into_iter()
+        .map(|s| transform_statement(s, &mut persistent_params))
+        .collect();
+    function.params.extend(persistent_params);
 
     function
 }

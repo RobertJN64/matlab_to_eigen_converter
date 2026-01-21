@@ -296,7 +296,7 @@ fn generate_output_for_function(
     line_num: &mut u32,
 ) -> String {
     format!(
-        "{} {}({}) {{{}return {};\n}}",
+        "{} {}({}) {{{}return {};\n}}\n",
         type_to_cpp(
             *ti_state
                 .get("_self")
@@ -307,9 +307,9 @@ fn generate_output_for_function(
             .params
             .into_iter()
             .map(|p| {
-                let type_str = match ti_state.get(&p) {
+                let type_str = match ti_state.get(p.strip_prefix("&").unwrap_or(&p)) {
                     Some(t) => type_to_cpp(*t),
-                    None => format!("{}_t", p),
+                    None => format!("{}_t", p.strip_prefix("&").unwrap_or(&p)),
                 };
                 format!("{} {}", type_str, p)
             })
