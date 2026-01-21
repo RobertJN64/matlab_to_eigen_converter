@@ -117,9 +117,13 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFunction> {
         );
 
         let mul_div = exponents.clone().foldl(
-            choice((kw("*").to(MLtBinOp::Mul), kw("/").to(MLtBinOp::Div)))
-                .then(exponents)
-                .repeated(),
+            choice((
+                kw("*").to(MLtBinOp::Mul),
+                kw("/").to(MLtBinOp::Div),
+                kw(".*").to(MLtBinOp::CwiseMul),
+            ))
+            .then(exponents)
+            .repeated(),
             |l, (op, r)| MLtExpr::BinOp(Box::new(l), op, Box::new(r)),
         );
 

@@ -141,6 +141,7 @@ fn binop_to_cpp(binop: MLtBinOp) -> &'static str {
         MLtBinOp::Add => "+",
         MLtBinOp::Sub => "-",
         MLtBinOp::Mul => "*",
+        MLtBinOp::CwiseMul => ".*",
         MLtBinOp::Div => "/",
         MLtBinOp::Pow => "^",
         MLtBinOp::And => "&&",
@@ -172,30 +173,48 @@ fn expr_to_cpp(
         }
         MLtExpr::BinOp(mlt_exprl, mlt_bin_op, mlt_exprr) => {
             // if dividing by a matrix mul by the inverse instead
-            if matches!(mlt_bin_op, MLtBinOp::Div)
-                && !matches!(
-                    *mlt_exprr,
-                    MLtExpr::Basic(MLtLValue::Integer(_) | MLtLValue::Float(_))
-                )
-            {
-                format!(
-                    "{} * {}.inverse()",
-                    expr_to_cpp(*mlt_exprl, ti_state, line_num),
-                    expr_to_cpp(*mlt_exprr, ti_state, line_num)
-                )
-            } else if matches!(mlt_bin_op, MLtBinOp::Pow) {
-                format!(
-                    "pow({}, {})",
-                    expr_to_cpp(*mlt_exprl, ti_state, line_num),
-                    expr_to_cpp(*mlt_exprr, ti_state, line_num)
-                )
-            } else {
-                format!(
-                    "{} {} {}",
-                    expr_to_cpp(*mlt_exprl, ti_state, line_num),
-                    binop_to_cpp(mlt_bin_op),
-                    expr_to_cpp(*mlt_exprr, ti_state, line_num)
-                )
+            match mlt_bin_op {
+                MLtBinOp::Div => {
+                    if !matches!(
+                        *mlt_exprr,
+                        MLtExpr::Basic(MLtLValue::Integer(_) | MLtLValue::Float(_))
+                    ) {
+                        format!(
+                            "{} * {}.inverse()",
+                            expr_to_cpp(*mlt_exprl, ti_state, line_num),
+                            expr_to_cpp(*mlt_exprr, ti_state, line_num)
+                        )
+                    } else {
+                        format!(
+                            "{} {} {}",
+                            expr_to_cpp(*mlt_exprl, ti_state, line_num),
+                            binop_to_cpp(mlt_bin_op),
+                            expr_to_cpp(*mlt_exprr, ti_state, line_num)
+                        )
+                    }
+                }
+                MLtBinOp::Pow => {
+                    format!(
+                        "pow({}, {})",
+                        expr_to_cpp(*mlt_exprl, ti_state, line_num),
+                        expr_to_cpp(*mlt_exprr, ti_state, line_num)
+                    )
+                }
+                MLtBinOp::CwiseMul => {
+                    format!(
+                        "{}.cwiseProduct({})",
+                        expr_to_cpp(*mlt_exprl, ti_state, line_num),
+                        expr_to_cpp(*mlt_exprr, ti_state, line_num)
+                    )
+                }
+                _ => {
+                    format!(
+                        "{} {} {}",
+                        expr_to_cpp(*mlt_exprl, ti_state, line_num),
+                        binop_to_cpp(mlt_bin_op),
+                        expr_to_cpp(*mlt_exprr, ti_state, line_num)
+                    )
+                }
             }
         }
     }

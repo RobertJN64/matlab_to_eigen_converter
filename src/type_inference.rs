@@ -178,6 +178,7 @@ pub fn expr_type(
                     }
                 }
                 MLtBinOp::Pow => expr_type(left, ti_state, line_num),
+                MLtBinOp::CwiseMul => expr_type(left, ti_state, line_num),
                 MLtBinOp::And | MLtBinOp::Or => (1, 1), // float is basically a bool - TODO - check that inputs are bools
                 MLtBinOp::EqualTo | MLtBinOp::NotEqualTo => (1, 1), // float is basically a bool - TODO - check that input shapes match
                 MLtBinOp::LessThan
