@@ -59,20 +59,21 @@ fn lvalue_type(lvalue: &MLtLValue, ti_state: &mut HashMap<String, (u32, u32)>) -
                 }
                 panic!("eye expects one integer argument");
             }
-            "zeros" => {
+            "ones" | "zeros" => {
                 if let Some(MLtExpr::Basic(MLtLValue::Integer(rows))) = function_params.get(0) {
                     if let Some(MLtExpr::Basic(MLtLValue::Integer(cols))) = function_params.get(1) {
-                        let rows = rows.parse().expect("Argument to zeros must be an int");
-                        let cols = cols.parse().expect("Argument to zeros must be an int");
+                        let rows = rows.parse().expect("Argument to ones|zeros must be an int");
+                        let cols = cols.parse().expect("Argument to ones|zeros must be an int");
                         return (rows, cols);
                     }
                 }
-                panic!("zeros expects two integer arguments");
+                panic!("ones|zeros expects two integer arguments");
             }
             fname => {
                 if let Some((rows, cols)) = ti_state.get(fname) {
                     (*rows, *cols)
                 } else {
+                    println!("Couldn't find {} in functions", fname);
                     (0, 0)
                 }
             }
@@ -107,7 +108,8 @@ pub fn expr_type(expr: &MLtExpr, ti_state: &mut HashMap<String, (u32, u32)>) -> 
                         // mul by scalar
                         (lrows, lcols)
                     } else {
-                        (0, 0)
+                        // TODO - type check the matrix mul
+                        (lrows, rcols)
                     }
                 }
                 MLtBinOp::Div => {
@@ -117,10 +119,11 @@ pub fn expr_type(expr: &MLtExpr, ti_state: &mut HashMap<String, (u32, u32)>) -> 
                         // division by scalar
                         (lrows, lcols)
                     } else {
-                        (0, 0)
+                        // same as multiplying by the inverse, which doesn't change the size
+                        (lrows, rcols)
                     }
                 }
-                MLtBinOp::Pow => (0, 0),
+                MLtBinOp::Pow => expr_type(left, ti_state),
                 MLtBinOp::And | MLtBinOp::Or => (1, 1), // float is basically a bool - TODO - check that inputs are bools
                 MLtBinOp::EqualTo | MLtBinOp::NotEqualTo => (1, 1), // float is basically a bool - TODO - check that input shapes match
             }

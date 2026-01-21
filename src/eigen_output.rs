@@ -80,6 +80,14 @@ fn function_call_to_cpp(
                 .collect::<Vec<_>>()
                 .join(", ")
         ),
+        "diag" => format!(
+            "({}).asDiagonal()",
+            function_params
+                .into_iter()
+                .map(|p| expr_to_cpp(p, ti_state))
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
         _ => format!(
             "{}({})",
             function_name,
@@ -100,7 +108,7 @@ fn lvalue_to_cpp(lvalue: MLtLValue, ti_state: &mut HashMap<String, (u32, u32)>) 
             format!("{}.{}", struct_name, matrix_to_cpp(matrix))
         }
         MLtLValue::InlineMatrix(mlt_exprs) => format!(
-            "{}({})",
+            "({}() << {}).finished()",
             type_to_cpp(inline_matrix_type(&mlt_exprs, ti_state)),
             mlt_exprs
                 .into_iter()
@@ -138,12 +146,32 @@ fn expr_to_cpp(expr: MLtExpr, ti_state: &mut HashMap<String, (u32, u32)>) -> Str
             format!("({})", expr_to_cpp(*mlt_expr, ti_state))
         }
         MLtExpr::BinOp(mlt_exprl, mlt_bin_op, mlt_exprr) => {
-            format!(
-                "{} {} {}",
-                expr_to_cpp(*mlt_exprl, ti_state),
-                binop_to_cpp(mlt_bin_op),
-                expr_to_cpp(*mlt_exprr, ti_state)
-            )
+            // if dividing by a matrix mul by the inverse instead
+            if matches!(mlt_bin_op, MLtBinOp::Div)
+                && !matches!(
+                    *mlt_exprr,
+                    MLtExpr::Basic(MLtLValue::Integer(_) | MLtLValue::Float(_))
+                )
+            {
+                format!(
+                    "{} * {}.inverse()",
+                    expr_to_cpp(*mlt_exprl, ti_state),
+                    expr_to_cpp(*mlt_exprr, ti_state)
+                )
+            } else if matches!(mlt_bin_op, MLtBinOp::Pow) {
+                format!(
+                    "pow({}, {})",
+                    expr_to_cpp(*mlt_exprl, ti_state),
+                    expr_to_cpp(*mlt_exprr, ti_state)
+                )
+            } else {
+                format!(
+                    "{} {} {}",
+                    expr_to_cpp(*mlt_exprl, ti_state),
+                    binop_to_cpp(mlt_bin_op),
+                    expr_to_cpp(*mlt_exprr, ti_state)
+                )
+            }
         }
     }
 }
@@ -176,10 +204,10 @@ fn generate_output_for_statement(
         MLtStatement::Assignment(lvalue, expr) => {
             let simple_matrix = lvalue_is_simple_matrix(&lvalue); // we don't place types on matrix accesses
             let left_side_cpp = lvalue_to_cpp(lvalue, ti_state);
+            let right_side_type = expr_type(&expr, ti_state);
 
             // don't apply type if we already have a type recorded
             if simple_matrix && !ti_state.contains_key(&left_side_cpp) {
-                let right_side_type = expr_type(&expr, ti_state);
                 ti_state.insert(left_side_cpp.clone(), right_side_type);
                 format!(
                     "{} {} = {};\n",
@@ -188,6 +216,7 @@ fn generate_output_for_statement(
                     expr_to_cpp(expr, ti_state)
                 )
             } else {
+                // TODO - ensure that both sides are the same
                 format!("{} = {};\n", left_side_cpp, expr_to_cpp(expr, ti_state))
             }
         }
@@ -232,9 +261,25 @@ fn generate_output_for_function(
     ti_state: &mut HashMap<String, (u32, u32)>,
 ) -> String {
     format!(
-        "void {}({}) {{\n{}return {};\n}}",
+        "{} {}({}) {{\n{}return {};\n}}",
+        type_to_cpp(
+            *ti_state
+                .get("_self")
+                .expect("ti_state should have `_self` to represent function return type")
+        ),
         function.name,
-        function.params.join(", "), // TODO - add in types
+        function
+            .params
+            .into_iter()
+            .map(|p| {
+                let type_str = match ti_state.get(&p) {
+                    Some(t) => type_to_cpp(*t),
+                    None => format!("{}_t", p),
+                };
+                format!("{} {}", type_str, p)
+            })
+            .collect::<Vec<String>>()
+            .join(", "),
         generate_output_for_statement_list(function.body, ti_state),
         function.return_obj
     )

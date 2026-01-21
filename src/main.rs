@@ -17,15 +17,20 @@ fn main() {
     // type_inference state - stores function return types and matrix state
     let mut ti_state = HashMap::from(
         [
+            ("_self", (13, 1)), // return type of the function being converted
             ("quatRot", (3, 3)),
             ("StateTransitionMat", (12, 12)),
             ("HamiltonianProd", (4, 4)),
             ("expm", (12, 12)), // matrixExpPade6
             ("GND", (1, 1)),
+            ("dT", (1, 1)),
             ("constantsASTRA.g", (1, 1)),
             ("constantsASTRA.Q", (12, 12)),
             ("constantsASTRA.R", (6, 6)),
             ("constantsASTRA.mag", (3, 1)),
+            ("P", (12, 12)),
+            ("z", (15, 1)),
+            ("x_est", (13, 1)),
         ]
         .map(|(name, (rows, cols))| (name.to_string(), (rows, cols))),
     );
