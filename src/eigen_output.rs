@@ -41,6 +41,42 @@ fn matrix_to_cpp(matrix: MLtMatrixAccess) -> String {
     }
 }
 
+fn function_to_dot_function(
+    function_name: &str,
+    function_params: Vec<MLtExpr>,
+    ti_state: &mut HashMap<String, (u32, u32)>,
+    line_num: &mut u32,
+) -> String {
+    let fname_map = HashMap::from([
+        ("diag", "asDiagonal()"),
+        ("abs", "cwiseAbs()"),
+        ("norm", "norm()"),
+        ("exp", "array().exp().matrix()"),
+    ]);
+    let dot_name = fname_map
+        .get(function_name)
+        .expect(format!("missing {} in dot_name map", function_name).as_str());
+    match function_params.as_slice() {
+        [MLtExpr::Basic(lvalue)] => {
+            format!(
+                "{}.{}",
+                lvalue_to_cpp(lvalue.clone(), ti_state, line_num),
+                dot_name
+            )
+        }
+        [expr] => {
+            format!(
+                "({}).{}",
+                expr_to_cpp(expr.clone(), ti_state, line_num),
+                dot_name
+            )
+        }
+        _ => {
+            panic!("{} must have exactly 1 arg", function_name)
+        }
+    }
+}
+
 fn function_call_to_cpp(
     function_name: String,
     function_params: Vec<MLtExpr>,
@@ -90,14 +126,45 @@ fn function_call_to_cpp(
                 .collect::<Vec<_>>()
                 .join(", ")
         ),
-        "diag" => format!(
-            "({}).asDiagonal()",
-            function_params
-                .into_iter()
-                .map(|p| expr_to_cpp(p, ti_state, line_num))
-                .collect::<Vec<_>>()
-                .join(", ")
-        ),
+        "diag" | "abs" | "norm" | "exp" => {
+            function_to_dot_function(&function_name, function_params, ti_state, line_num)
+        }
+        "min" => {
+            if let Some(mlt_expr_l) = function_params.get(0) {
+                if let Some(mlt_expr_r) = function_params.get(1) {
+                    return format!(
+                        "{}.cwiseMin({})",
+                        expr_to_cpp(mlt_expr_l.clone(), ti_state, line_num),
+                        expr_to_cpp(mlt_expr_r.clone(), ti_state, line_num)
+                    );
+                }
+            }
+            panic!("min expects two arguments");
+        }
+        "max" => {
+            if let Some(mlt_expr_l) = function_params.get(0) {
+                if let Some(mlt_expr_r) = function_params.get(1) {
+                    return format!(
+                        "{}.cwiseMax({})",
+                        expr_to_cpp(mlt_expr_l.clone(), ti_state, line_num),
+                        expr_to_cpp(mlt_expr_r.clone(), ti_state, line_num)
+                    );
+                }
+            }
+            panic!("max expects two arguments");
+        }
+        "cross" => {
+            if let Some(mlt_expr_l) = function_params.get(0) {
+                if let Some(mlt_expr_r) = function_params.get(1) {
+                    return format!(
+                        "{}.cross({})",
+                        expr_to_cpp(mlt_expr_l.clone(), ti_state, line_num),
+                        expr_to_cpp(mlt_expr_r.clone(), ti_state, line_num)
+                    );
+                }
+            }
+            panic!("cross expects two arguments");
+        }
         _ => format!(
             "{}({})",
             function_name,
@@ -143,7 +210,9 @@ fn binop_to_cpp(binop: MLtBinOp) -> &'static str {
         MLtBinOp::Mul => "*",
         MLtBinOp::CwiseMul => ".*",
         MLtBinOp::Div => "/",
+        MLtBinOp::CwiseDiv => "./",
         MLtBinOp::Pow => "^",
+        MLtBinOp::CwisePow => ".^",
         MLtBinOp::And => "&&",
         MLtBinOp::Or => "||",
         MLtBinOp::EqualTo => "==",
@@ -175,10 +244,7 @@ fn expr_to_cpp(
             // if dividing by a matrix mul by the inverse instead
             match mlt_bin_op {
                 MLtBinOp::Div => {
-                    if !matches!(
-                        *mlt_exprr,
-                        MLtExpr::Basic(MLtLValue::Integer(_) | MLtLValue::Float(_))
-                    ) {
+                    if expr_type(&mlt_exprr, ti_state, line_num) != (1, 1) {
                         format!(
                             "{} * {}.inverse()",
                             expr_to_cpp(*mlt_exprl, ti_state, line_num),
@@ -206,6 +272,27 @@ fn expr_to_cpp(
                         expr_to_cpp(*mlt_exprl, ti_state, line_num),
                         expr_to_cpp(*mlt_exprr, ti_state, line_num)
                     )
+                }
+                MLtBinOp::CwiseDiv => {
+                    format!(
+                        "{}.cwiseQuotient({})",
+                        expr_to_cpp(*mlt_exprl, ti_state, line_num),
+                        expr_to_cpp(*mlt_exprr, ti_state, line_num)
+                    )
+                }
+                MLtBinOp::CwisePow => {
+                    match *mlt_exprr {
+                        MLtExpr::Basic(MLtLValue::Integer(v)) => {
+                            if v == "2" {
+                                return format!(
+                                    "{}.cwiseAbs2()",
+                                    expr_to_cpp(*mlt_exprl, ti_state, line_num),
+                                );
+                            }
+                        }
+                        _ => {}
+                    }
+                    panic!("CwisePow only supports .^2");
                 }
                 _ => {
                     format!(

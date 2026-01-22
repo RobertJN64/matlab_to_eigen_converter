@@ -40,9 +40,33 @@ pub fn transform_matrix_multisegment(lvalue: MLtLValue) -> MLtLValue {
     }
 }
 
+fn transform_pi(lvalue: MLtLValue) -> MLtLValue {
+    match lvalue {
+        MLtLValue::Matrix(MLtMatrixAccess::Matrix(name)) => {
+            if name == "pi" {
+                MLtLValue::Matrix(MLtMatrixAccess::Matrix("M_PI".to_string()))
+            } else {
+                MLtLValue::Matrix(MLtMatrixAccess::Matrix(name))
+            }
+        }
+        MLtLValue::InlineMatrix(mlt_exprs) => {
+            MLtLValue::InlineMatrix(mlt_exprs.into_iter().map(transform_expression).collect())
+        }
+        MLtLValue::FunctionCall(name, mlt_exprs) => MLtLValue::FunctionCall(
+            name,
+            mlt_exprs.into_iter().map(transform_expression).collect(),
+        ),
+        _ => lvalue,
+    }
+}
+
+fn transform_lvalue(lvalue: MLtLValue) -> MLtLValue {
+    transform_pi(transform_matrix_multisegment(lvalue))
+}
+
 pub fn transform_expression(expr: MLtExpr) -> MLtExpr {
     match expr {
-        MLtExpr::Basic(mlt_lvalue) => MLtExpr::Basic(transform_matrix_multisegment(mlt_lvalue)),
+        MLtExpr::Basic(mlt_lvalue) => MLtExpr::Basic(transform_lvalue(mlt_lvalue)),
         MLtExpr::Negation(mlt_expr) => MLtExpr::Negation(Box::new(transform_expression(*mlt_expr))),
         MLtExpr::Transposed(mlt_expr) => {
             MLtExpr::Transposed(Box::new(transform_expression(*mlt_expr)))
@@ -91,10 +115,7 @@ fn transform_statement(
     }
 
     if let MLtStatement::Assignment(left, right) = statement {
-        return MLtStatement::Assignment(
-            transform_matrix_multisegment(left),
-            transform_expression(right),
-        );
+        return MLtStatement::Assignment(transform_lvalue(left), transform_expression(right));
     }
 
     if let MLtStatement::Persistent(new_persis_params) = statement.clone() {

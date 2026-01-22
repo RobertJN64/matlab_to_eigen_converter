@@ -56,15 +56,6 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFunction> {
     let mut mlt_expr = Recursive::declare();
 
     mlt_lvalue.define(choice((
-        int(10)
-            .then_ignore(just("."))
-            .then(int(10))
-            .map(|(int_v, float_v)| MLtLValue::Float(format!("{}.{}", int_v, float_v))),
-        int(10)
-            .then_ignore(just("e"))
-            .then(int(10))
-            .map(|(int_v, exp_v)| MLtLValue::Float(format!("{}e{}", int_v, exp_v))),
-        int(10).map(String::from).map(MLtLValue::Integer),
         sident()
             .then(
                 mlt_expr
@@ -78,6 +69,17 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFunction> {
             .then_ignore(kw("."))
             .then(mlt_matrix.clone())
             .map(|(struct_name, matrix)| MLtLValue::StructMatrix(struct_name, matrix)),
+        one_of("1234567890.e")
+            .repeated()
+            .at_least(1)
+            .collect()
+            .map(|s: String| {
+                if s.contains(".") || s.contains("e") {
+                    MLtLValue::Float(s)
+                } else {
+                    MLtLValue::Integer(s)
+                }
+            }),
         mlt_expr
             .clone()
             .separated_by(kw(";"))
@@ -112,7 +114,9 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFunction> {
         ));
 
         let exponents = transposed_atom.clone().foldl(
-            kw("^").to(MLtBinOp::Pow).then(transposed_atom).repeated(),
+            choice((kw("^").to(MLtBinOp::Pow), kw(".^").to(MLtBinOp::CwisePow)))
+                .then(transposed_atom)
+                .repeated(),
             |l, (op, r)| MLtExpr::BinOp(Box::new(l), op, Box::new(r)),
         );
 
@@ -121,6 +125,7 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFunction> {
                 kw("*").to(MLtBinOp::Mul),
                 kw("/").to(MLtBinOp::Div),
                 kw(".*").to(MLtBinOp::CwiseMul),
+                kw("./").to(MLtBinOp::CwiseDiv),
             ))
             .then(exponents)
             .repeated(),

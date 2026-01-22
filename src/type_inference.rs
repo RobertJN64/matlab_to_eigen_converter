@@ -87,13 +87,15 @@ pub fn lvalue_type(
                 }
                 panic!("ones|zeros expects two integer arguments");
             }
-            "expm" => {
+            // same size as the left arg
+            "expm" | "min" | "max" | "cross" | "abs" | "exp" => {
                 if let Some(expr) = function_params.get(0) {
                     let (rows, cols) = expr_type(expr, ti_state, line_num);
                     return (rows, cols);
                 }
-                panic!("expm expects one matrix argument");
+                panic!("expm|min|max|cross|abs|exp expects at least one matrix argument");
             }
+            "norm" => (1, 1),
             "diag" => {
                 if let Some(expr) = function_params.get(0) {
                     let (rows, cols) = expr_type(expr, ti_state, line_num);
@@ -177,8 +179,8 @@ pub fn expr_type(
                         (lrows, rcols)
                     }
                 }
-                MLtBinOp::Pow => expr_type(left, ti_state, line_num),
-                MLtBinOp::CwiseMul => expr_type(left, ti_state, line_num),
+                MLtBinOp::Pow | MLtBinOp::CwisePow => expr_type(left, ti_state, line_num),
+                MLtBinOp::CwiseMul | MLtBinOp::CwiseDiv => expr_type(left, ti_state, line_num),
                 MLtBinOp::And | MLtBinOp::Or => (1, 1), // float is basically a bool - TODO - check that inputs are bools
                 MLtBinOp::EqualTo | MLtBinOp::NotEqualTo => (1, 1), // float is basically a bool - TODO - check that input shapes match
                 MLtBinOp::LessThan

@@ -57,7 +57,9 @@ pub enum MLtBinOp {
     Mul,
     CwiseMul, // component/element wise mul
     Div,
+    CwiseDiv, // component/element wise div
     Pow,
+    CwisePow, // component/element wise pow
     And,
     Or,
     EqualTo,
