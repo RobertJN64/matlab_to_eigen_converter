@@ -13,6 +13,7 @@ To set parameter and function types, edit `src/main.rs`.
 ### Limitations
  - Functions must return a single variable
  - The matlab file should start with `function` and end with `end`, with no comments before or after
+ - If statements currently don't support else
 
 ### AST
 

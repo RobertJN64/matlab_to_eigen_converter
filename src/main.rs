@@ -23,18 +23,22 @@ fn main() {
     let mut ti_state = HashMap::from(
         [
             ("_self", (13, 1)), // return type of the function being converted
-            ("quatRot", (3, 3)),
-            ("StateTransitionMat", (12, 12)),
-            ("HamiltonianProd", (4, 4)),
-            ("zetaCross", (3, 3)),
-            ("expm", (12, 12)), // matrixExpPade6
-            ("GND", (1, 1)),
-            ("dT", (1, 1)),
+            ("M_PI", (1, 1)),
+            // used across several functions
             ("constantsASTRA.g", (1, 1)),
-            ("constantsASTRA.Q", (12, 12)),
+            ("constantsASTRA.m", (1, 1)),
+            ("constantsASTRA.Q", (18, 18)),
             ("constantsASTRA.R", (6, 6)),
             ("constantsASTRA.mag", (3, 1)),
-            ("P", (12, 12)),
+            // pablo's functions
+            ("StateTransitionMat", (9, 9)),
+            ("HamiltonianProd", (4, 4)),
+            ("zetaCross", (3, 3)),
+            ("quatRot", (3, 3)),
+            // estimator types
+            ("dT", (1, 1)),
+            ("P", (9, 9)),
+            ("P0", (9, 9)),
             ("z", (15, 1)),
             ("x_est", (13, 1)),
             ("lastZ", (15, 1)),
