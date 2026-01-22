@@ -60,8 +60,28 @@ fn transform_pi(lvalue: MLtLValue) -> MLtLValue {
     }
 }
 
+fn transform_matrix_index(lvalue: MLtLValue) -> MLtLValue {
+    let allowed_function_calls = vec!["ones", "zeros", "eye"];
+    match lvalue.clone() {
+        MLtLValue::FunctionCall(fname, mlt_exprs) => match mlt_exprs.as_slice() {
+            [MLtExpr::Basic(MLtLValue::Integer(idx))] => {
+                if allowed_function_calls.contains(&fname.as_str()) {
+                    lvalue
+                } else {
+                    MLtLValue::Matrix(MLtMatrixAccess::MatrixIndex(
+                        fname,
+                        idx.parse().expect("failed to parse integer to int"),
+                    ))
+                }
+            }
+            _ => lvalue,
+        },
+        _ => lvalue,
+    }
+}
+
 fn transform_lvalue(lvalue: MLtLValue) -> MLtLValue {
-    transform_pi(transform_matrix_multisegment(lvalue))
+    transform_matrix_index(transform_pi(transform_matrix_multisegment(lvalue)))
 }
 
 pub fn transform_expression(expr: MLtExpr) -> MLtExpr {
@@ -107,7 +127,7 @@ fn transform_statement(
 
     if let MLtStatement::IfStatement(expr, body) = statement {
         return MLtStatement::IfStatement(
-            expr,
+            transform_expression(expr),
             body.into_iter()
                 .map(|s| transform_statement(s, persistent_params))
                 .collect(),

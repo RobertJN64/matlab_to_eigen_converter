@@ -20,9 +20,10 @@ pub enum MLtStatement {
 #[derive(Clone, Debug)]
 pub enum MLtMatrixAccess {
     Matrix(String),                            // z
-    MatrixSegment(String, MLtRange),           // z(1:3)
+    MatrixIndex(String, u32), // z(1) - this is impossible to tell from a function call during parsing so we catch it as a transform
+    MatrixSegment(String, MLtRange), // z(1:3)
     MatrixMultiSegment(String, Vec<MLtRange>), // z([1:3 7:9])
-    MatrixBlock(String, MLtRange, MLtRange),   // z(1:3, 4:5)
+    MatrixBlock(String, MLtRange, MLtRange), // z(1:3, 4:5)
 }
 
 #[derive(Clone, Debug)]

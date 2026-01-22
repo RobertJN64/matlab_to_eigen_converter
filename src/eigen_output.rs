@@ -14,6 +14,9 @@ fn type_to_cpp((rows, cols): (u32, u32)) -> String {
 fn matrix_to_cpp(matrix: MLtMatrixAccess) -> String {
     match matrix {
         MLtMatrixAccess::Matrix(ident) => ident,
+        MLtMatrixAccess::MatrixIndex(ident, idx) => {
+            format!("{}[{}]", ident, idx - 1)
+        }
         MLtMatrixAccess::MatrixSegment(ident, mlt_range) => {
             let range_width = mlt_range.end - mlt_range.start + 1;
             format!(
@@ -310,6 +313,7 @@ fn expr_to_cpp(
 fn matrix_access_should_have_type(matrix: &MLtMatrixAccess) -> bool {
     match matrix {
         MLtMatrixAccess::Matrix(_) => true,
+        MLtMatrixAccess::MatrixIndex(_, _) => false,
         MLtMatrixAccess::MatrixSegment(_, _) => false,
         MLtMatrixAccess::MatrixMultiSegment(_, _) => false,
         MLtMatrixAccess::MatrixBlock(_, _, _) => false,
