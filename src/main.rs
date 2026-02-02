@@ -40,7 +40,7 @@ fn main() {
             ("P", (9, 9)),
             ("P0", (9, 9)),
             ("z", (15, 1)),
-            ("x_est", (13, 1)),
+            ("x_est", (19, 1)),
             ("lastZ", (15, 1)),
         ]
         .map(|(name, (rows, cols))| (name.to_string(), (rows, cols))),

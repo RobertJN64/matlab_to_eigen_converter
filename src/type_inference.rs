@@ -43,13 +43,73 @@ fn matrix_type(
                 (0, 0)
             }
         }
-        MLtMatrixAccess::MatrixIndex(_, _) => (1, 1),
-        MLtMatrixAccess::MatrixSegment(_, mlt_range) => (mlt_range.end - mlt_range.start + 1, 1),
+        MLtMatrixAccess::MatrixIndex(name, idx) => {
+            if let Some((rows, cols)) = ti_state.get(format!("{}{}", prefix, name).as_str()) {
+                if *cols == 1 {
+                    if *idx > *rows {
+                        println!(
+                            "Matrix index type warning - tried to access index at {} on {}{} which has {} rows",
+                            *idx, prefix, name, *rows
+                        );
+                    }
+                } else {
+                    println!(
+                        "Matrix index type warning - {}{} is not a vector",
+                        prefix, name
+                    );
+                }
+            } else {
+                println!(
+                    "Matrix index type warning - couldn't find {}{} in types so can't perform matrix bounds check",
+                    prefix, name
+                );
+            }
+            (1, 1)
+        }
+        MLtMatrixAccess::MatrixSegment(name, mlt_range) => {
+            if let Some((rows, cols)) = ti_state.get(format!("{}{}", prefix, name).as_str()) {
+                if *cols == 1 {
+                    if mlt_range.end > *rows {
+                        println!(
+                            "Matrix segment type warning - tried to access segment ending at {} on {}{} which has {} rows",
+                            mlt_range.end, prefix, name, *rows
+                        );
+                    }
+                } else {
+                    println!(
+                        "Matrix segment type warning - {}{} is not a vector",
+                        prefix, name
+                    );
+                }
+            } else {
+                println!(
+                    "Matrix segment type warning - couldn't find {}{} in types so can't perform matrix bounds check",
+                    prefix, name
+                );
+            }
+            (mlt_range.end - mlt_range.start + 1, 1)
+        }
         MLtMatrixAccess::MatrixMultiSegment(_, _) => {
             panic!("MatrixMultiSegment should be converted to an inline matrix")
         }
-        MLtMatrixAccess::MatrixBlock(_, rows, cols) => {
-            (rows.end - rows.start + 1, cols.end - cols.start + 1)
+        MLtMatrixAccess::MatrixBlock(name, row_range, col_range) => {
+            if let Some((rows, cols)) = ti_state.get(format!("{}{}", prefix, name).as_str()) {
+                if row_range.end > *rows || col_range.end > *cols {
+                    println!(
+                        "Matrix block type warning - tried to access block ending at {},{} on {}{} which has size {},{}",
+                        row_range.end, col_range.end, prefix, name, *rows, *cols
+                    );
+                }
+            } else {
+                println!(
+                    "Matrix block type warning - couldn't find {}{} in types so can't perform matrix bounds check",
+                    prefix, name
+                );
+            }
+            (
+                row_range.end - row_range.start + 1,
+                col_range.end - col_range.start + 1,
+            )
         }
     }
 }
