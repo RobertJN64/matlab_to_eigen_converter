@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=DM+Sans:wght@400;500&display=swap');
+
+    .cols {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .pane {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .code_box {
+      resize: vertical;
+      height: 280px;
+      background: #222222;
+      color: var(--color-text-primary);
+    }
+
+    body {
+      background-color: #222222;
+      color: #e8e8e8;
+      font-family: 'IBM Plex Mono', monospace;
+      padding-left: 10px;
+      padding-right: 10px;
+    }
+  </style>
+
+</head>
+
+<body>
+  <h1>Matlab -> Eigen Transpiler</h1>
+  <div class="cols">
+    <div class="pane">
+      <h3>Matlab Input</h3>
+      <textarea id="ml_src" class="code_box" spellcheck="false"
+        placeholder="Paste your matlab source code here..."></textarea>
+    </div>
+
+    <div class="pane">
+      <h3>C++ Output</h3>
+      <textarea id="cpp_out" class="code_box" readonly spellcheck="false"
+        placeholder="C++ output will appear here..."></textarea>
+    </div>
+  </div>
+  <button onclick="runTranspile()">Convert!</button>
+
+  <script>
+    async function loadWasm() {
+      const { default: init, transpile } = await import('./pkg/matlab_to_eigen_conv.js');
+      await init();
+      window.wasmTranspile = transpile;
+    }
+
+    loadWasm();
+
+    function runTranspile() {
+      const ml_src = document.getElementById('ml_src').value.trim();
+      const cpp_out = document.getElementById('cpp_out');
+      if (!ml_src) return;
+
+      if (window.wasmTranspile) {
+        try {
+          const result = window.wasmTranspile(ml_src);
+          cpp_out.value = result;
+        } catch (e) {
+          cpp_out.value = String(e);
+        }
+      } else {
+        cpp_out.value = 'Error loading wasm module.';
+      }
+    }
+
+  </script>
+</body>
+
+</html>

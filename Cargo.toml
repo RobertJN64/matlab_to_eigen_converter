@@ -3,5 +3,9 @@ name = "matlab_to_eigen_conv"
 version = "0.1.0"
 edition = "2024"
 
+[lib]
+crate-type = ["cdylib"]
+
 [dependencies]
 chumsky = "0.12.0"
+wasm-bindgen = "0.2"

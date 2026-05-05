@@ -1,13 +1,9 @@
 use chumsky::prelude::*;
-use eigen_output::generate_output_file;
+use eigen_output::generate_eigen_output;
 use ml_parser::parser;
-use std::{
-    collections::HashMap,
-    env,
-    fs::{self, File},
-    io::Write,
-};
+use std::collections::HashMap;
 use transform::transform_ast;
+use wasm_bindgen::prelude::*;
 
 mod eigen_output;
 mod ml_parser;
@@ -15,9 +11,9 @@ mod syntax;
 mod transform;
 mod type_inference;
 
-fn main() {
-    let src = fs::read_to_string(env::args().nth(1).expect("Expected file argument"))
-        .expect("Failed to read file");
+#[wasm_bindgen]
+pub fn transpile(src: &str) -> String {
+    // TODO - import TI state
 
     // type_inference state - stores function return types and matrix state
     let mut ti_state = HashMap::from(
@@ -49,13 +45,11 @@ fn main() {
     let (ast, err) = parser().parse(src.trim()).into_output_errors();
     match ast {
         Some(ast) => {
-            let mut file = File::create("out.dbg").unwrap();
-            let _ = file.write_all(format!("{ast:#?}").as_bytes());
             let ast = transform_ast(ast);
-            generate_output_file(ast, &mut ti_state);
+            generate_eigen_output(ast, &mut ti_state)
         }
         None => {
-            println!("Error while parsing. {:#?}", err);
+            format!("Error while parsing. {:#?}", err)
         }
     }
 }

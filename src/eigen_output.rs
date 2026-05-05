@@ -1,7 +1,6 @@
 use crate::syntax::*;
 use crate::type_inference::{expr_type, inline_matrix_type, lvalue_type};
 use std::collections::HashMap;
-use std::{fs::File, io::Write};
 
 fn type_to_cpp((rows, cols): (u32, u32)) -> String {
     match (rows, cols) {
@@ -443,10 +442,16 @@ fn generate_output_for_function(
     )
 }
 
-pub fn generate_output_file(function: MLtFunction, ti_state: &mut HashMap<String, (u32, u32)>) {
-    let mut file = File::create("out.cpp").unwrap();
+pub fn generate_eigen_output(
+    function: MLtFunction,
+    ti_state: &mut HashMap<String, (u32, u32)>,
+) -> String {
     let mut line_num = 3;
-    let _ = file.write_all("#include \"matlab_funcs.h\"\n\n".as_bytes());
-    let _ =
-        file.write_all(generate_output_for_function(function, ti_state, &mut line_num).as_bytes());
+    let mut output = String::from("#include \"matlab_funcs.h\"\n\n");
+    output.push_str(&generate_output_for_function(
+        function,
+        ti_state,
+        &mut line_num,
+    ));
+    output
 }
