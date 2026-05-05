@@ -50,7 +50,6 @@
         placeholder="C++ output will appear here..."></textarea>
     </div>
   </div>
-  <button onclick="runTranspile()">Convert!</button>
 
   <script>
     async function loadWasm() {
@@ -61,22 +60,39 @@
 
     loadWasm();
 
+    const ml_src_box = document.getElementById('ml_src');
+    const cpp_out_box = document.getElementById('cpp_out');
+
     function runTranspile() {
-      const ml_src = document.getElementById('ml_src').value.trim();
-      const cpp_out = document.getElementById('cpp_out');
+      const ml_src = ml_src_box.value.trim();
       if (!ml_src) return;
 
       if (window.wasmTranspile) {
         try {
           const result = window.wasmTranspile(ml_src);
-          cpp_out.value = result;
+          cpp_out_box.value = result;
         } catch (e) {
-          cpp_out.value = String(e);
+          cpp_out_box.value = String(e);
         }
       } else {
-        cpp_out.value = 'Error loading wasm module.';
+        cpp_out_box.value = 'Error loading wasm module.';
       }
     }
+
+    document.getElementById('ml_src').addEventListener('input', () => {
+      runTranspile();
+    });
+
+    ml_src_box.addEventListener('scroll', () => {
+      const pct = ml_src_box.scrollTop / (ml_src_box.scrollHeight - ml_src_box.clientHeight);
+      cpp_out_box.scrollTop = pct * (cpp_out_box.scrollHeight - cpp_out_box.clientHeight);
+    });
+
+    cpp_out_box.addEventListener('scroll', () => {
+      const pct = cpp_out_box.scrollTop / (cpp_out_box.scrollHeight - cpp_out_box.clientHeight);
+      ml_src_box.scrollTop = pct * (ml_src_box.scrollHeight - ml_src_box.clientHeight);
+    });
+
 
   </script>
 </body>
