@@ -439,7 +439,7 @@ fn generate_output_for_function(
             .collect::<Vec<String>>()
             .join(", "),
         generate_output_for_statement_list(function.body, ti_state, line_num),
-        function.return_obj
+        function.return_obj // TODO - type check this
     )
 }
 

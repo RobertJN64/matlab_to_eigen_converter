@@ -69,13 +69,14 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFunction> {
             .then_ignore(kw("."))
             .then(mlt_matrix.clone())
             .map(|(struct_name, matrix)| MLtLValue::StructMatrix(struct_name, matrix)),
+        // TODO - this is grabbing vars that start with e
         one_of("1234567890.e")
             .repeated()
             .at_least(1)
             .collect()
             .map(|s: String| {
                 if s.contains(".") || s.contains("e") {
-                    MLtLValue::Float(s)
+                    MLtLValue::Float(s) // TODO - this fails on 1e-12 or similar
                 } else {
                     MLtLValue::Integer(s)
                 }
