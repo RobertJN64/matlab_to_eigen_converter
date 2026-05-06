@@ -6,22 +6,15 @@
     @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=DM+Sans:wght@400;500&display=swap');
 
     .cols {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
+      display: flex;
       gap: 16px;
     }
 
     .pane {
-      display: flex;
-      flex-direction: column;
       gap: 8px;
-    }
+      flex: 1;
+      min-width: 0;
 
-    .code_box {
-      resize: vertical;
-      height: 280px;
-      background: #222222;
-      color: var(--color-text-primary);
     }
 
     body {
@@ -33,25 +26,51 @@
     }
   </style>
 
-</head>
+  <script type="module">
+    import { EditorView, basicSetup } from "https://esm.sh/codemirror"
+    import { EditorState } from "https://esm.sh/@codemirror/state"
+    import { oneDark } from 'https://esm.sh/@codemirror/theme-one-dark';
+    import { cpp } from 'https://esm.sh/@codemirror/lang-cpp';
+    import { octave } from 'https://esm.sh/@codemirror/legacy-modes/mode/octave' // matlab
+    import { StreamLanguage } from 'https://esm.sh/@codemirror/language';
 
-<body>
-  <h1>Matlab -> Eigen Transpiler</h1>
-  <div class="cols">
-    <div class="pane">
-      <h3>Matlab Input</h3>
-      <textarea id="ml_src" class="code_box" spellcheck="false"
-        placeholder="Paste your matlab source code here..."></textarea>
-    </div>
 
-    <div class="pane">
-      <h3>C++ Output</h3>
-      <textarea id="cpp_out" class="code_box" readonly spellcheck="false"
-        placeholder="C++ output will appear here..."></textarea>
-    </div>
-  </div>
+    const srcView = new EditorView({
+      extensions: [basicSetup, oneDark, StreamLanguage.define(octave),
+        EditorView.theme({
+          "&": { maxHeight: "500px" },
+          ".cm-scroller": { overflow: "auto" },
+        }),
+        EditorView.updateListener.of((update) => {
+          if (update.docChanged) {
+            runTranspile();
+          }
+        }),
+        EditorView.lineWrapping
+      ],
+      parent: document.getElementById('src-editor')
 
-  <script>
+    });
+
+    const outView = new EditorView({
+      extensions: [basicSetup, oneDark, cpp(), EditorState.readOnly.of(true),
+        EditorView.theme({
+          "&": { maxHeight: "500px" },
+          ".cm-scroller": { overflow: "auto" },
+        }),
+        EditorView.lineWrapping
+      ],
+      parent: document.getElementById('out-editor')
+    });
+
+    // get input value
+    const getSrc = () => srcView.state.doc.toString();
+
+    // set output value
+    const setOut = (text) => outView.dispatch({
+      changes: { from: 0, to: outView.state.doc.length, insert: text }
+    });
+
     async function loadWasm() {
       const { default: init, transpile } = await import('./pkg/matlab_to_eigen_conv.js');
       await init();
@@ -60,41 +79,54 @@
 
     loadWasm();
 
-    const ml_src_box = document.getElementById('ml_src');
-    const cpp_out_box = document.getElementById('cpp_out');
-
     function runTranspile() {
-      const ml_src = ml_src_box.value.trim();
+      const ml_src = getSrc();
       if (!ml_src) return;
 
       if (window.wasmTranspile) {
         try {
           const result = window.wasmTranspile(ml_src);
-          cpp_out_box.value = result;
+          setOut(result);
         } catch (e) {
-          cpp_out_box.value = String(e);
+          setOut(String(e));
         }
       } else {
-        cpp_out_box.value = 'Error loading wasm module.';
+        setOut('Error loading wasm module.');
       }
     }
 
-    document.getElementById('ml_src').addEventListener('input', () => {
-      runTranspile();
+    const srcScroller = srcView.scrollDOM;
+    const outScroller = outView.scrollDOM;
+
+    srcScroller.addEventListener('scroll', () => {
+      const pct = srcScroller.scrollTop / (srcScroller.scrollHeight - srcScroller.clientHeight);
+      outScroller.scrollTop = pct * (outScroller.scrollHeight - outScroller.clientHeight);
     });
 
-    ml_src_box.addEventListener('scroll', () => {
-      const pct = ml_src_box.scrollTop / (ml_src_box.scrollHeight - ml_src_box.clientHeight);
-      cpp_out_box.scrollTop = pct * (cpp_out_box.scrollHeight - cpp_out_box.clientHeight);
-    });
-
-    cpp_out_box.addEventListener('scroll', () => {
-      const pct = cpp_out_box.scrollTop / (cpp_out_box.scrollHeight - cpp_out_box.clientHeight);
-      ml_src_box.scrollTop = pct * (ml_src_box.scrollHeight - ml_src_box.clientHeight);
+    outScroller.addEventListener('scroll', () => {
+      const pct = outScroller.scrollTop / (outScroller.scrollHeight - outScroller.clientHeight);
+      srcScroller.scrollTop = pct * (srcScroller.scrollHeight - srcScroller.clientHeight);
     });
 
 
   </script>
+
+</head>
+
+<body>
+  <h1>Matlab -> Eigen Transpiler</h1>
+  <div class="cols">
+    <div class="pane">
+      <h3>Matlab Input</h3>
+      <div id="src-editor"></div>
+    </div>
+
+    <div class="pane">
+      <h3>C++ Output</h3>
+      <div id="out-editor"></div>
+    </div>
+  </div>
+
 </body>
 
 </html>
