@@ -48,8 +48,8 @@
         }),
         EditorView.lineWrapping
       ],
-      parent: document.getElementById('src-editor')
-
+      parent: document.getElementById('src-editor'),
+      doc: "% Paste your matlab source code here...\n\n\n\n\n\n\n\n\n"
     });
 
     const outView = new EditorView({
@@ -60,7 +60,8 @@
         }),
         EditorView.lineWrapping
       ],
-      parent: document.getElementById('out-editor')
+      parent: document.getElementById('out-editor'),
+      doc: "// C++ output will appear here...\n\n\n\n\n\n\n\n\n"
     });
 
     // get input value
