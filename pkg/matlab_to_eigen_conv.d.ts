@@ -9,14 +9,14 @@ export class TranspilerOutput {
     readonly warnings: string;
 }
 
-export function transpile(src: string, types: string): TranspilerOutput;
+export function transpile_wrap(src: string, types: string): TranspilerOutput;
 
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 
 export interface InitOutput {
     readonly memory: WebAssembly.Memory;
     readonly __wbg_transpileroutput_free: (a: number, b: number) => void;
-    readonly transpile: (a: number, b: number, c: number, d: number) => number;
+    readonly transpile_wrap: (a: number, b: number, c: number, d: number) => number;
     readonly transpileroutput_result: (a: number) => [number, number];
     readonly transpileroutput_warnings: (a: number) => [number, number];
     readonly __wbindgen_externrefs: WebAssembly.Table;

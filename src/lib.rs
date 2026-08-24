@@ -1,11 +1,13 @@
 use chumsky::prelude::*;
+use std::collections::HashMap;
+use std::fmt::Write;
+use wasm_bindgen::prelude::*;
+
 use eigen_output::generate_eigen_output;
 use error::TranspilerError;
 use ml_parser::parser;
-use std::collections::HashMap;
 use transform::transform_ast;
-use type_inference::name_to_type;
-use wasm_bindgen::prelude::*;
+use type_inference::parse_type;
 
 mod eigen_output;
 mod error;
@@ -34,34 +36,34 @@ impl TranspilerOutput {
 }
 
 #[wasm_bindgen]
-pub fn transpile(src: &str, types: &str) -> TranspilerOutput {
+pub fn transpile_wrap(src: &str, types: &str) -> TranspilerOutput {
     let mut warnings = String::new();
 
-    transpile_impl(src, types, &mut warnings)
+    transpile(src, types, &mut warnings)
         .map(|r| TranspilerOutput {
             result: r,
             warnings: warnings,
         })
         .unwrap_or_else(|e| TranspilerOutput {
             result: String::new(),
-            warnings: e.to_string(),
+            warnings: format!("{}", e.0),
         })
 }
 
-fn transpile_impl(
-    src: &str,
-    types: &str,
-    warnings: &mut String,
-) -> Result<String, TranspilerError> {
+// TODO - make more errors into warnings
+
+fn transpile(src: &str, types: &str, warnings: &mut String) -> Result<String, TranspilerError> {
     let mut ti_state = HashMap::new();
     for line in types.lines() {
-        if !line.trim().is_empty() {
-            // TODO - make more errors into warnings
-            // TODO - handle comments
-            let (first, second) = line.split_once(": ").ok_or(TranspilerError(
-                "Types should be written as <name: type>.".to_string(),
-            ))?;
-            ti_state.insert(first.to_string(), name_to_type(second)?);
+        if !line.trim().is_empty() && !line.trim().starts_with("#") {
+            match parse_type(line) {
+                Ok((name, matrix_type)) => {
+                    ti_state.insert(name.to_string(), matrix_type);
+                }
+                Err(e) => {
+                    writeln!(warnings, "Error parsing <{}>: {}", line, e.0).unwrap();
+                }
+            }
         }
     }
 

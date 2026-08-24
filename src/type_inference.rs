@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::fmt::Write;
 
-use crate::error::InvalidType;
+use crate::error::TypeParseError;
 use crate::syntax::*;
 
 // returns the type (rows, cols) of a matlab expression so the C++ type can be inserted
@@ -276,27 +276,43 @@ pub fn expr_type(
     }
 }
 
-pub fn name_to_type(name: &str) -> Result<(u32, u32), InvalidType> {
+pub fn name_to_type(name: &str) -> Result<(u32, u32), TypeParseError> {
     match name {
         "float" | "double" | "int" | "bool" => Ok((1, 1)),
 
         s if let Some(n) = s.strip_prefix("Vector") => {
-            let n = n.parse().map_err(|_| InvalidType(name.to_string()))?;
+            let n = n.parse().map_err(|_| {
+                TypeParseError(format!("Vector types should be written like Vector#."))
+            })?;
             Ok((n, 1))
         }
 
         s if let Some(dims) = s.strip_prefix("Matrix") => {
-            let (rows, cols) = dims
-                .split_once('_')
-                .ok_or_else(|| InvalidType(name.to_string()))?;
+            let (rows, cols) = dims.split_once('_').ok_or_else(|| {
+                TypeParseError(format!("Matrix types should be written like Matrix#_#."))
+            })?;
 
-            let rows = rows.parse().map_err(|_| InvalidType(name.to_string()))?;
+            let rows = rows.parse().map_err(|_| {
+                TypeParseError(format!("Matrix types should be written like Matrix#_#."))
+            })?;
 
-            let cols = cols.parse().map_err(|_| InvalidType(name.to_string()))?;
+            let cols = cols.parse().map_err(|_| {
+                TypeParseError(format!("Matrix types should be written like Matrix#_#."))
+            })?;
 
             Ok((rows, cols))
         }
 
-        _ => Err(InvalidType(name.to_string())),
+        _ => Err(TypeParseError(format!(
+            "Type should be Matrix, Vector, float, double, int or bool."
+        ))),
     }
+}
+
+pub fn parse_type(line: &str) -> Result<(&str, (u32, u32)), TypeParseError> {
+    let (first, second) = line.split_once(": ").ok_or(TypeParseError(
+        "Types should be written as <name: type>.".to_string(),
+    ))?;
+
+    return Ok((first, name_to_type(second)?));
 }

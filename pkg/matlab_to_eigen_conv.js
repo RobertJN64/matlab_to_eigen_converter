@@ -55,12 +55,12 @@ if (Symbol.dispose) TranspilerOutput.prototype[Symbol.dispose] = TranspilerOutpu
  * @param {string} types
  * @returns {TranspilerOutput}
  */
-export function transpile(src, types) {
+export function transpile_wrap(src, types) {
     const ptr0 = passStringToWasm0(src, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
     const len0 = WASM_VECTOR_LEN;
     const ptr1 = passStringToWasm0(types, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
     const len1 = WASM_VECTOR_LEN;
-    const ret = wasm.transpile(ptr0, len0, ptr1, len1);
+    const ret = wasm.transpile_wrap(ptr0, len0, ptr1, len1);
     return TranspilerOutput.__wrap(ret);
 }
 function __wbg_get_imports() {
