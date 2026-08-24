@@ -1,29 +1,74 @@
 /* @ts-self-types="./matlab_to_eigen_conv.d.ts" */
 
+export class TranspilerOutput {
+    static __wrap(ptr) {
+        const obj = Object.create(TranspilerOutput.prototype);
+        obj.__wbg_ptr = ptr;
+        TranspilerOutputFinalization.register(obj, obj.__wbg_ptr, obj);
+        return obj;
+    }
+    __destroy_into_raw() {
+        const ptr = this.__wbg_ptr;
+        this.__wbg_ptr = 0;
+        TranspilerOutputFinalization.unregister(this);
+        return ptr;
+    }
+    free() {
+        const ptr = this.__destroy_into_raw();
+        wasm.__wbg_transpileroutput_free(ptr, 0);
+    }
+    /**
+     * @returns {string}
+     */
+    get result() {
+        let deferred1_0;
+        let deferred1_1;
+        try {
+            const ret = wasm.transpileroutput_result(this.__wbg_ptr);
+            deferred1_0 = ret[0];
+            deferred1_1 = ret[1];
+            return getStringFromWasm0(ret[0], ret[1]);
+        } finally {
+            wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
+        }
+    }
+    /**
+     * @returns {string}
+     */
+    get warnings() {
+        let deferred1_0;
+        let deferred1_1;
+        try {
+            const ret = wasm.transpileroutput_warnings(this.__wbg_ptr);
+            deferred1_0 = ret[0];
+            deferred1_1 = ret[1];
+            return getStringFromWasm0(ret[0], ret[1]);
+        } finally {
+            wasm.__wbindgen_free(deferred1_0, deferred1_1, 1);
+        }
+    }
+}
+if (Symbol.dispose) TranspilerOutput.prototype[Symbol.dispose] = TranspilerOutput.prototype.free;
+
 /**
  * @param {string} src
  * @param {string} types
- * @returns {string}
+ * @returns {TranspilerOutput}
  */
 export function transpile(src, types) {
-    let deferred3_0;
-    let deferred3_1;
-    try {
-        const ptr0 = passStringToWasm0(src, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-        const len0 = WASM_VECTOR_LEN;
-        const ptr1 = passStringToWasm0(types, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
-        const len1 = WASM_VECTOR_LEN;
-        const ret = wasm.transpile(ptr0, len0, ptr1, len1);
-        deferred3_0 = ret[0];
-        deferred3_1 = ret[1];
-        return getStringFromWasm0(ret[0], ret[1]);
-    } finally {
-        wasm.__wbindgen_free(deferred3_0, deferred3_1, 1);
-    }
+    const ptr0 = passStringToWasm0(src, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ptr1 = passStringToWasm0(types, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    const len1 = WASM_VECTOR_LEN;
+    const ret = wasm.transpile(ptr0, len0, ptr1, len1);
+    return TranspilerOutput.__wrap(ret);
 }
 function __wbg_get_imports() {
     const import0 = {
         __proto__: null,
+        __wbg___wbindgen_throw_bb96b2010945f0bc: function(arg0, arg1) {
+            throw new Error(getStringFromWasm0(arg0, arg1));
+        },
         __wbindgen_init_externref_table: function() {
             const table = wasm.__wbindgen_externrefs;
             const offset = table.grow(4);
@@ -39,6 +84,10 @@ function __wbg_get_imports() {
         "./matlab_to_eigen_conv_bg.js": import0,
     };
 }
+
+const TranspilerOutputFinalization = (typeof FinalizationRegistry === 'undefined')
+    ? { register: () => {}, unregister: () => {} }
+    : new FinalizationRegistry(ptr => wasm.__wbg_transpileroutput_free(ptr, 1));
 
 function getStringFromWasm0(ptr, len) {
     return decodeText(ptr >>> 0, len);

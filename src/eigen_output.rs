@@ -2,6 +2,7 @@ use crate::error::TranspilerError;
 use crate::syntax::*;
 use crate::type_inference::{expr_type, inline_matrix_type, lvalue_type};
 use std::collections::HashMap;
+use std::fmt::Write;
 
 fn type_to_cpp((rows, cols): (u32, u32)) -> String {
     match (rows, cols) {
@@ -49,6 +50,7 @@ fn function_to_dot_function(
     function_params: Vec<MLtExpr>,
     ti_state: &mut HashMap<String, (u32, u32)>,
     line_num: &mut u32,
+    warnings: &mut String,
 ) -> String {
     let fname_map = HashMap::from([
         ("diag", "asDiagonal()"),
@@ -63,14 +65,14 @@ fn function_to_dot_function(
         [MLtExpr::Basic(lvalue)] => {
             format!(
                 "{}.{}",
-                lvalue_to_cpp(lvalue.clone(), ti_state, line_num),
+                lvalue_to_cpp(lvalue.clone(), ti_state, line_num, warnings),
                 dot_name
             )
         }
         [expr] => {
             format!(
                 "({}).{}",
-                expr_to_cpp(expr.clone(), ti_state, line_num),
+                expr_to_cpp(expr.clone(), ti_state, line_num, warnings),
                 dot_name
             )
         }
@@ -85,6 +87,7 @@ fn function_call_to_cpp(
     function_params: Vec<MLtExpr>,
     ti_state: &mut HashMap<String, (u32, u32)>,
     line_num: &mut u32,
+    warnings: &mut String,
 ) -> String {
     match function_name.as_str() {
         "eye" => {
@@ -125,20 +128,24 @@ fn function_call_to_cpp(
             "matrixExpPade6({})",
             function_params
                 .into_iter()
-                .map(|p| expr_to_cpp(p, ti_state, line_num))
+                .map(|p| expr_to_cpp(p, ti_state, line_num, warnings))
                 .collect::<Vec<_>>()
                 .join(", ")
         ),
-        "diag" | "abs" | "norm" | "exp" => {
-            function_to_dot_function(&function_name, function_params, ti_state, line_num)
-        }
+        "diag" | "abs" | "norm" | "exp" => function_to_dot_function(
+            &function_name,
+            function_params,
+            ti_state,
+            line_num,
+            warnings,
+        ),
         "min" => {
             if let Some(mlt_expr_l) = function_params.get(0) {
                 if let Some(mlt_expr_r) = function_params.get(1) {
                     return format!(
                         "{}.cwiseMin({})",
-                        expr_to_cpp(mlt_expr_l.clone(), ti_state, line_num),
-                        expr_to_cpp(mlt_expr_r.clone(), ti_state, line_num)
+                        expr_to_cpp(mlt_expr_l.clone(), ti_state, line_num, warnings),
+                        expr_to_cpp(mlt_expr_r.clone(), ti_state, line_num, warnings)
                     );
                 }
             }
@@ -149,8 +156,8 @@ fn function_call_to_cpp(
                 if let Some(mlt_expr_r) = function_params.get(1) {
                     return format!(
                         "{}.cwiseMax({})",
-                        expr_to_cpp(mlt_expr_l.clone(), ti_state, line_num),
-                        expr_to_cpp(mlt_expr_r.clone(), ti_state, line_num)
+                        expr_to_cpp(mlt_expr_l.clone(), ti_state, line_num, warnings),
+                        expr_to_cpp(mlt_expr_r.clone(), ti_state, line_num, warnings)
                     );
                 }
             }
@@ -161,8 +168,8 @@ fn function_call_to_cpp(
                 if let Some(mlt_expr_r) = function_params.get(1) {
                     return format!(
                         "{}.cross({})",
-                        expr_to_cpp(mlt_expr_l.clone(), ti_state, line_num),
-                        expr_to_cpp(mlt_expr_r.clone(), ti_state, line_num)
+                        expr_to_cpp(mlt_expr_l.clone(), ti_state, line_num, warnings),
+                        expr_to_cpp(mlt_expr_r.clone(), ti_state, line_num, warnings)
                     );
                 }
             }
@@ -173,7 +180,7 @@ fn function_call_to_cpp(
             function_name,
             function_params
                 .into_iter()
-                .map(|p| expr_to_cpp(p, ti_state, line_num))
+                .map(|p| expr_to_cpp(p, ti_state, line_num, warnings))
                 .collect::<Vec<_>>()
                 .join(", ")
         ),
@@ -184,6 +191,7 @@ fn lvalue_to_cpp(
     lvalue: MLtLValue,
     ti_state: &mut HashMap<String, (u32, u32)>,
     line_num: &mut u32,
+    warnings: &mut String,
 ) -> String {
     match lvalue {
         MLtLValue::Integer(val) | MLtLValue::Float(val) => format!("{}", val),
@@ -193,15 +201,15 @@ fn lvalue_to_cpp(
         }
         MLtLValue::InlineMatrix(mlt_exprs) => format!(
             "({}() << {}).finished()",
-            type_to_cpp(inline_matrix_type(&mlt_exprs, ti_state, line_num)),
+            type_to_cpp(inline_matrix_type(&mlt_exprs, ti_state, line_num, warnings)),
             mlt_exprs
                 .into_iter()
-                .map(|v| expr_to_cpp(v, ti_state, line_num))
+                .map(|v| expr_to_cpp(v, ti_state, line_num, warnings))
                 .collect::<Vec<_>>()
                 .join(", ")
         ),
         MLtLValue::FunctionCall(function_name, function_params) => {
-            function_call_to_cpp(function_name, function_params, ti_state, line_num)
+            function_call_to_cpp(function_name, function_params, ti_state, line_num, warnings)
         }
     }
 }
@@ -231,56 +239,60 @@ fn expr_to_cpp(
     expr: MLtExpr,
     ti_state: &mut HashMap<String, (u32, u32)>,
     line_num: &mut u32,
+    warnings: &mut String,
 ) -> String {
     match expr {
-        MLtExpr::Basic(mlt_lvalue) => lvalue_to_cpp(mlt_lvalue, ti_state, line_num),
+        MLtExpr::Basic(mlt_lvalue) => lvalue_to_cpp(mlt_lvalue, ti_state, line_num, warnings),
         MLtExpr::Negation(mlt_expr) => {
-            format!("-{}", expr_to_cpp(*mlt_expr, ti_state, line_num))
+            format!("-{}", expr_to_cpp(*mlt_expr, ti_state, line_num, warnings))
         }
         MLtExpr::Transposed(mlt_expr) => {
-            format!("{}.transpose()", expr_to_cpp(*mlt_expr, ti_state, line_num))
+            format!(
+                "{}.transpose()",
+                expr_to_cpp(*mlt_expr, ti_state, line_num, warnings)
+            )
         }
         MLtExpr::Parenthesized(mlt_expr) => {
-            format!("({})", expr_to_cpp(*mlt_expr, ti_state, line_num))
+            format!("({})", expr_to_cpp(*mlt_expr, ti_state, line_num, warnings))
         }
         MLtExpr::BinOp(mlt_exprl, mlt_bin_op, mlt_exprr) => {
             // if dividing by a matrix mul by the inverse instead
             match mlt_bin_op {
                 MLtBinOp::Div => {
-                    if expr_type(&mlt_exprr, ti_state, line_num) != (1, 1) {
+                    if expr_type(&mlt_exprr, ti_state, line_num, warnings) != (1, 1) {
                         format!(
                             "{} * {}.inverse()",
-                            expr_to_cpp(*mlt_exprl, ti_state, line_num),
-                            expr_to_cpp(*mlt_exprr, ti_state, line_num)
+                            expr_to_cpp(*mlt_exprl, ti_state, line_num, warnings),
+                            expr_to_cpp(*mlt_exprr, ti_state, line_num, warnings)
                         )
                     } else {
                         format!(
                             "{} {} {}",
-                            expr_to_cpp(*mlt_exprl, ti_state, line_num),
+                            expr_to_cpp(*mlt_exprl, ti_state, line_num, warnings),
                             binop_to_cpp(mlt_bin_op),
-                            expr_to_cpp(*mlt_exprr, ti_state, line_num)
+                            expr_to_cpp(*mlt_exprr, ti_state, line_num, warnings)
                         )
                     }
                 }
                 MLtBinOp::Pow => {
                     format!(
                         "pow({}, {})",
-                        expr_to_cpp(*mlt_exprl, ti_state, line_num),
-                        expr_to_cpp(*mlt_exprr, ti_state, line_num)
+                        expr_to_cpp(*mlt_exprl, ti_state, line_num, warnings),
+                        expr_to_cpp(*mlt_exprr, ti_state, line_num, warnings)
                     )
                 }
                 MLtBinOp::CwiseMul => {
                     format!(
                         "{}.cwiseProduct({})",
-                        expr_to_cpp(*mlt_exprl, ti_state, line_num),
-                        expr_to_cpp(*mlt_exprr, ti_state, line_num)
+                        expr_to_cpp(*mlt_exprl, ti_state, line_num, warnings),
+                        expr_to_cpp(*mlt_exprr, ti_state, line_num, warnings)
                     )
                 }
                 MLtBinOp::CwiseDiv => {
                     format!(
                         "{}.cwiseQuotient({})",
-                        expr_to_cpp(*mlt_exprl, ti_state, line_num),
-                        expr_to_cpp(*mlt_exprr, ti_state, line_num)
+                        expr_to_cpp(*mlt_exprl, ti_state, line_num, warnings),
+                        expr_to_cpp(*mlt_exprr, ti_state, line_num, warnings)
                     )
                 }
                 MLtBinOp::CwisePow => {
@@ -289,7 +301,7 @@ fn expr_to_cpp(
                             if v == "2" {
                                 return format!(
                                     "{}.cwiseAbs2()",
-                                    expr_to_cpp(*mlt_exprl, ti_state, line_num),
+                                    expr_to_cpp(*mlt_exprl, ti_state, line_num, warnings),
                                 );
                             }
                         }
@@ -300,9 +312,9 @@ fn expr_to_cpp(
                 _ => {
                     format!(
                         "{} {} {}",
-                        expr_to_cpp(*mlt_exprl, ti_state, line_num),
+                        expr_to_cpp(*mlt_exprl, ti_state, line_num, warnings),
                         binop_to_cpp(mlt_bin_op),
-                        expr_to_cpp(*mlt_exprr, ti_state, line_num)
+                        expr_to_cpp(*mlt_exprr, ti_state, line_num, warnings)
                     )
                 }
             }
@@ -336,13 +348,14 @@ fn generate_output_for_statement(
     statement: MLtStatement,
     ti_state: &mut HashMap<String, (u32, u32)>,
     line_num: &mut u32,
+    warnings: &mut String,
 ) -> String {
     match statement {
         MLtStatement::Assignment(lvalue, expr) => {
             let simple_matrix = lvalue_is_simple_matrix(&lvalue); // we don't place types on matrix accesses
-            let left_side_cpp = lvalue_to_cpp(lvalue.clone(), ti_state, line_num);
-            let right_side_type = expr_type(&expr, ti_state, line_num);
-            let right_side_cpp = expr_to_cpp(expr, ti_state, line_num);
+            let left_side_cpp = lvalue_to_cpp(lvalue.clone(), ti_state, line_num, warnings);
+            let right_side_type = expr_type(&expr, ti_state, line_num, warnings);
+            let right_side_cpp = expr_to_cpp(expr, ti_state, line_num, warnings);
 
             // don't apply type if we already have a type recorded
             if simple_matrix && !ti_state.contains_key(&left_side_cpp) {
@@ -354,16 +367,17 @@ fn generate_output_for_statement(
                     right_side_cpp
                 )
             } else {
-                let left_side_type = lvalue_type(&lvalue, ti_state, line_num);
+                let left_side_type = lvalue_type(&lvalue, ti_state, line_num, warnings);
                 if left_side_type != right_side_type {
-                    println!(
+                    let _ = writeln!(
+                        warnings,
                         "Assignment type warning: left side type does not match right side type: ({}, {}) != ({}, {}) on line {}.",
                         left_side_type.0,
                         left_side_type.1,
                         right_side_type.0,
                         right_side_type.1,
                         line_num
-                    )
+                    );
                 }
                 format!("{} = {};", left_side_cpp, right_side_cpp)
             }
@@ -382,9 +396,14 @@ fn generate_output_for_statement(
             *line_num += 1;
             let text = format!(
                 "if ({}) {{\n{}}}",
-                expr_to_cpp(mlt_expr, ti_state, line_num),
+                expr_to_cpp(mlt_expr, ti_state, line_num, warnings),
                 // clone ti_state here to prevent types from propagating outside the if statement
-                generate_output_for_statement_list(mlt_statements, &mut ti_state.clone(), line_num)
+                generate_output_for_statement_list(
+                    mlt_statements,
+                    &mut ti_state.clone(),
+                    line_num,
+                    warnings
+                )
             );
             text
         }
@@ -406,10 +425,11 @@ fn generate_output_for_statement_list(
     statement_list: Vec<MLtStatement>,
     ti_state: &mut HashMap<String, (u32, u32)>,
     line_num: &mut u32,
+    warnings: &mut String,
 ) -> String {
     statement_list
         .into_iter()
-        .map(|s| generate_output_for_statement(s, ti_state, line_num))
+        .map(|s| generate_output_for_statement(s, ti_state, line_num, warnings))
         .collect()
 }
 
@@ -417,6 +437,7 @@ fn generate_output_for_function(
     function: MLtFunction,
     ti_state: &mut HashMap<String, (u32, u32)>,
     line_num: &mut u32,
+    warnings: &mut String,
 ) -> Result<String, TranspilerError> {
     // TODO - infer function type from returns, handle multiple returns, etc.
     Ok(format!(
@@ -437,7 +458,7 @@ fn generate_output_for_function(
             })
             .collect::<Vec<String>>()
             .join(", "),
-        generate_output_for_statement_list(function.body, ti_state, line_num),
+        generate_output_for_statement_list(function.body, ti_state, line_num, warnings),
         function.return_obj // TODO - type check this
     ))
 }
@@ -445,6 +466,7 @@ fn generate_output_for_function(
 pub fn generate_eigen_output(
     function: MLtFunction,
     ti_state: &mut HashMap<String, (u32, u32)>,
+    warnings: &mut String,
 ) -> Result<String, TranspilerError> {
     let mut line_num = 3;
     let mut output = String::from("#include \"matlab_funcs.h\"\n\n");
@@ -452,6 +474,7 @@ pub fn generate_eigen_output(
         function,
         ti_state,
         &mut line_num,
+        warnings,
     )?);
     Ok(output)
 }

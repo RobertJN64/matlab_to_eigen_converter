@@ -1,13 +1,24 @@
 /* tslint:disable */
 /* eslint-disable */
 
-export function transpile(src: string, types: string): string;
+export class TranspilerOutput {
+    private constructor();
+    free(): void;
+    [Symbol.dispose](): void;
+    readonly result: string;
+    readonly warnings: string;
+}
+
+export function transpile(src: string, types: string): TranspilerOutput;
 
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 
 export interface InitOutput {
     readonly memory: WebAssembly.Memory;
-    readonly transpile: (a: number, b: number, c: number, d: number) => [number, number];
+    readonly __wbg_transpileroutput_free: (a: number, b: number) => void;
+    readonly transpile: (a: number, b: number, c: number, d: number) => number;
+    readonly transpileroutput_result: (a: number) => [number, number];
+    readonly transpileroutput_warnings: (a: number) => [number, number];
     readonly __wbindgen_externrefs: WebAssembly.Table;
     readonly __wbindgen_malloc: (a: number, b: number) => number;
     readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;

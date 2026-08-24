@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt::Write;
 
 use crate::error::InvalidType;
 use crate::syntax::*;
@@ -9,6 +10,7 @@ pub fn inline_matrix_type(
     exprs: &Vec<MLtExpr>,
     ti_state: &mut HashMap<String, (u32, u32)>,
     line_num: &mut u32,
+    warnings: &mut String,
 ) -> (u32, u32) {
     let (mut rows, cols) = expr_type(
         exprs
@@ -16,11 +18,13 @@ pub fn inline_matrix_type(
             .expect("Inline matrix must have at least one element"),
         ti_state,
         line_num,
+        warnings,
     );
     for expr in exprs.iter().skip(1) {
-        let (new_rows, new_cols) = expr_type(expr, ti_state, line_num);
+        let (new_rows, new_cols) = expr_type(expr, ti_state, line_num, warnings);
         if cols != new_cols {
-            println!(
+            let _ = writeln!(
+                warnings,
                 "Inline matrix type warning: concat: {} by {} with {} by {} on line {}.",
                 rows, cols, new_rows, new_cols, line_num
             );
@@ -34,13 +38,14 @@ fn matrix_type(
     prefix: &str,
     matrix: &MLtMatrixAccess,
     ti_state: &mut HashMap<String, (u32, u32)>,
+    warnings: &mut String,
 ) -> (u32, u32) {
     match matrix {
         MLtMatrixAccess::Matrix(name) => {
             if let Some((rows, cols)) = ti_state.get(format!("{}{}", prefix, name).as_str()) {
                 (*rows, *cols)
             } else {
-                println!("Couldn't find {}{} in types", prefix, name);
+                let _ = writeln!(warnings, "Couldn't find {}{} in types", prefix, name);
                 (0, 0)
             }
         }
@@ -48,19 +53,22 @@ fn matrix_type(
             if let Some((rows, cols)) = ti_state.get(format!("{}{}", prefix, name).as_str()) {
                 if *cols == 1 {
                     if *idx > *rows {
-                        println!(
+                        let _ = writeln!(
+                            warnings,
                             "Matrix index type warning - tried to access index at {} on {}{} which has {} rows",
                             *idx, prefix, name, *rows
                         );
                     }
                 } else {
-                    println!(
+                    let _ = writeln!(
+                        warnings,
                         "Matrix index type warning - {}{} is not a vector",
                         prefix, name
                     );
                 }
             } else {
-                println!(
+                let _ = writeln!(
+                    warnings,
                     "Matrix index type warning - couldn't find {}{} in types so can't perform matrix bounds check",
                     prefix, name
                 );
@@ -71,19 +79,22 @@ fn matrix_type(
             if let Some((rows, cols)) = ti_state.get(format!("{}{}", prefix, name).as_str()) {
                 if *cols == 1 {
                     if mlt_range.end > *rows {
-                        println!(
+                        let _ = writeln!(
+                            warnings,
                             "Matrix segment type warning - tried to access segment ending at {} on {}{} which has {} rows",
                             mlt_range.end, prefix, name, *rows
                         );
                     }
                 } else {
-                    println!(
+                    let _ = writeln!(
+                        warnings,
                         "Matrix segment type warning - {}{} is not a vector",
                         prefix, name
                     );
                 }
             } else {
-                println!(
+                let _ = writeln!(
+                    warnings,
                     "Matrix segment type warning - couldn't find {}{} in types so can't perform matrix bounds check",
                     prefix, name
                 );
@@ -96,13 +107,15 @@ fn matrix_type(
         MLtMatrixAccess::MatrixBlock(name, row_range, col_range) => {
             if let Some((rows, cols)) = ti_state.get(format!("{}{}", prefix, name).as_str()) {
                 if row_range.end > *rows || col_range.end > *cols {
-                    println!(
+                    let _ = writeln!(
+                        warnings,
                         "Matrix block type warning - tried to access block ending at {},{} on {}{} which has size {},{}",
                         row_range.end, col_range.end, prefix, name, *rows, *cols
                     );
                 }
             } else {
-                println!(
+                let _ = writeln!(
+                    warnings,
                     "Matrix block type warning - couldn't find {}{} in types so can't perform matrix bounds check",
                     prefix, name
                 );
@@ -119,14 +132,17 @@ pub fn lvalue_type(
     lvalue: &MLtLValue,
     ti_state: &mut HashMap<String, (u32, u32)>,
     line_num: &mut u32,
+    warnings: &mut String,
 ) -> (u32, u32) {
     match lvalue {
         MLtLValue::Integer(_) | MLtLValue::Float(_) => (1, 1),
-        MLtLValue::Matrix(matrix) => matrix_type("", matrix, ti_state),
+        MLtLValue::Matrix(matrix) => matrix_type("", matrix, ti_state, warnings),
         MLtLValue::StructMatrix(prefix, matrix) => {
-            matrix_type(format!("{}.", prefix).as_str(), matrix, ti_state)
+            matrix_type(format!("{}.", prefix).as_str(), matrix, ti_state, warnings)
         }
-        MLtLValue::InlineMatrix(lvalues) => inline_matrix_type(lvalues, ti_state, line_num),
+        MLtLValue::InlineMatrix(lvalues) => {
+            inline_matrix_type(lvalues, ti_state, line_num, warnings)
+        }
         MLtLValue::FunctionCall(function_name, function_params) => match function_name.as_str() {
             "eye" => {
                 if let Some(MLtExpr::Basic(MLtLValue::Integer(n))) = function_params.get(0) {
@@ -152,7 +168,7 @@ pub fn lvalue_type(
             // same size as the left arg
             "expm" | "min" | "max" | "cross" | "abs" | "exp" => {
                 if let Some(expr) = function_params.get(0) {
-                    let (rows, cols) = expr_type(expr, ti_state, line_num);
+                    let (rows, cols) = expr_type(expr, ti_state, line_num, warnings);
                     return (rows, cols);
                 }
                 panic!("expm|min|max|cross|abs|exp expects at least one matrix argument");
@@ -160,7 +176,7 @@ pub fn lvalue_type(
             "norm" => (1, 1),
             "diag" => {
                 if let Some(expr) = function_params.get(0) {
-                    let (rows, cols) = expr_type(expr, ti_state, line_num);
+                    let (rows, cols) = expr_type(expr, ti_state, line_num, warnings);
                     if cols == 1 {
                         return (rows, rows);
                     }
@@ -171,7 +187,7 @@ pub fn lvalue_type(
                 if let Some((rows, cols)) = ti_state.get(fname) {
                     (*rows, *cols)
                 } else {
-                    println!("Couldn't find {} in functions", fname);
+                    let _ = writeln!(warnings, "Couldn't find {} in functions", fname);
                     (0, 0)
                 }
             }
@@ -183,22 +199,24 @@ pub fn expr_type(
     expr: &MLtExpr,
     ti_state: &mut HashMap<String, (u32, u32)>,
     line_num: &mut u32,
+    warnings: &mut String,
 ) -> (u32, u32) {
     match expr {
-        MLtExpr::Basic(mlt_lvalue) => lvalue_type(mlt_lvalue, ti_state, line_num),
-        MLtExpr::Negation(mlt_expr) => expr_type(mlt_expr, ti_state, line_num),
+        MLtExpr::Basic(mlt_lvalue) => lvalue_type(mlt_lvalue, ti_state, line_num, warnings),
+        MLtExpr::Negation(mlt_expr) => expr_type(mlt_expr, ti_state, line_num, warnings),
         MLtExpr::Transposed(mlt_expr) => {
-            let (cols, rows) = expr_type(mlt_expr, ti_state, line_num);
+            let (cols, rows) = expr_type(mlt_expr, ti_state, line_num, warnings);
             (rows, cols) // transpose reverses the order
         }
-        MLtExpr::Parenthesized(mlt_expr) => expr_type(mlt_expr, ti_state, line_num),
+        MLtExpr::Parenthesized(mlt_expr) => expr_type(mlt_expr, ti_state, line_num, warnings),
         MLtExpr::BinOp(left, mlt_bin_op, right) => {
             match mlt_bin_op {
                 MLtBinOp::Add | MLtBinOp::Sub => {
-                    let (lrows, lcols) = expr_type(left, ti_state, line_num);
-                    let (rrows, rcols) = expr_type(right, ti_state, line_num);
+                    let (lrows, lcols) = expr_type(left, ti_state, line_num, warnings);
+                    let (rrows, rcols) = expr_type(right, ti_state, line_num, warnings);
                     if lrows != rrows || lcols != rcols {
-                        println!(
+                        let _ = writeln!(
+                            warnings,
                             "Matrix add/sub type warning: {} by {} +/- {} by {} on line {}.",
                             lrows, lcols, rrows, rcols, line_num
                         );
@@ -206,8 +224,8 @@ pub fn expr_type(
                     (lrows, lcols)
                 }
                 MLtBinOp::Mul => {
-                    let (lrows, lcols) = expr_type(left, ti_state, line_num);
-                    let (rrows, rcols) = expr_type(right, ti_state, line_num);
+                    let (lrows, lcols) = expr_type(left, ti_state, line_num, warnings);
+                    let (rrows, rcols) = expr_type(right, ti_state, line_num, warnings);
                     if lrows == 1 && lcols == 1 {
                         // mul by scalar
                         (rrows, rcols)
@@ -216,7 +234,8 @@ pub fn expr_type(
                         (lrows, lcols)
                     } else {
                         if lcols != rrows {
-                            println!(
+                            let _ = writeln!(
+                                warnings,
                                 "Matrix mul type warning: {} by {} * {} by {} on line {}.",
                                 lrows, lcols, rrows, rcols, line_num
                             );
@@ -225,15 +244,16 @@ pub fn expr_type(
                     }
                 }
                 MLtBinOp::Div => {
-                    let (lrows, lcols) = expr_type(left, ti_state, line_num);
-                    let (rrows, rcols) = expr_type(right, ti_state, line_num);
+                    let (lrows, lcols) = expr_type(left, ti_state, line_num, warnings);
+                    let (rrows, rcols) = expr_type(right, ti_state, line_num, warnings);
                     if rrows == 1 && rcols == 1 {
                         // division by scalar
                         (lrows, lcols)
                     } else {
                         // same as multiplying by the inverse, which doesn't change the size
                         if lcols != rrows {
-                            println!(
+                            let _ = writeln!(
+                                warnings,
                                 "Matrix div type warning: {} by {} / {} by {} on line {}.",
                                 lrows, lcols, rrows, rcols, line_num
                             );
@@ -241,8 +261,10 @@ pub fn expr_type(
                         (lrows, rcols)
                     }
                 }
-                MLtBinOp::Pow | MLtBinOp::CwisePow => expr_type(left, ti_state, line_num),
-                MLtBinOp::CwiseMul | MLtBinOp::CwiseDiv => expr_type(left, ti_state, line_num),
+                MLtBinOp::Pow | MLtBinOp::CwisePow => expr_type(left, ti_state, line_num, warnings),
+                MLtBinOp::CwiseMul | MLtBinOp::CwiseDiv => {
+                    expr_type(left, ti_state, line_num, warnings)
+                }
                 MLtBinOp::And | MLtBinOp::Or => (1, 1), // float is basically a bool - TODO - check that inputs are bools
                 MLtBinOp::EqualTo | MLtBinOp::NotEqualTo => (1, 1), // float is basically a bool - TODO - check that input shapes match
                 MLtBinOp::LessThan

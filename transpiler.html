@@ -81,6 +81,18 @@
       doc: "// C++ output will appear here...\n\n\n\n\n\n\n\n\n"
     });
 
+    const errView = new EditorView({
+      extensions: [basicSetup, oneDark, EditorState.readOnly.of(true),
+        EditorView.theme({
+          "&": { maxHeight: "500px" },
+          ".cm-scroller": { overflow: "auto" },
+        }),
+        EditorView.lineWrapping
+      ],
+      parent: document.getElementById('err-editor'),
+      doc: "No errors / warnings!...\n\n\n\n\n\n\n\n\n"
+    });
+
     // get input value
     const getSrc = () => srcView.state.doc.toString();
     const getTypes = () => typeView.state.doc.toString();
@@ -88,6 +100,11 @@
     // set output value
     const setOut = (text) => outView.dispatch({
       changes: { from: 0, to: outView.state.doc.length, insert: text }
+    });
+
+    // set output error value
+    const setErr = (text) => errView.dispatch({
+      changes: { from: 0, to: errView.state.doc.length, insert: text }
     });
 
     async function loadWasm() {
@@ -106,12 +123,15 @@
       if (window.wasmTranspile) {
         try {
           const result = window.wasmTranspile(ml_src, type_src);
-          setOut(result);
+          setOut(result.result);
+          setErr(result.warnings);
         } catch (e) {
-          setOut(String(e));
+          setOut('');
+          setErr(String(e));
         }
       } else {
-        setOut('Error loading wasm module.');
+        setOut('');
+        setErr('Error loading wasm module.');
       }
     }
 
@@ -147,6 +167,9 @@
     <div class="pane">
       <h3>C++ Output</h3>
       <div id="out-editor"></div>
+
+      <h3>Errors / Warnings</h3>
+      <div id="err-editor"></div>
     </div>
   </div>
 

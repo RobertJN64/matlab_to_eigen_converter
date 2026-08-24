@@ -15,15 +15,48 @@ mod transform;
 mod type_inference;
 
 #[wasm_bindgen]
-pub fn transpile(src: &str, types: &str) -> String {
-    transpile_impl(src, types).unwrap_or_else(|e| e.to_string())
+pub struct TranspilerOutput {
+    result: String,
+    warnings: String,
 }
 
-fn transpile_impl(src: &str, types: &str) -> Result<String, TranspilerError> {
+#[wasm_bindgen]
+impl TranspilerOutput {
+    #[wasm_bindgen(getter)]
+    pub fn result(&self) -> String {
+        self.result.clone()
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn warnings(&self) -> String {
+        self.warnings.clone()
+    }
+}
+
+#[wasm_bindgen]
+pub fn transpile(src: &str, types: &str) -> TranspilerOutput {
+    let mut warnings = String::new();
+
+    transpile_impl(src, types, &mut warnings)
+        .map(|r| TranspilerOutput {
+            result: r,
+            warnings: warnings,
+        })
+        .unwrap_or_else(|e| TranspilerOutput {
+            result: String::new(),
+            warnings: e.to_string(),
+        })
+}
+
+fn transpile_impl(
+    src: &str,
+    types: &str,
+    warnings: &mut String,
+) -> Result<String, TranspilerError> {
     let mut ti_state = HashMap::new();
     for line in types.lines() {
         if !line.trim().is_empty() {
-            // TODO - printed warnings should be visible in UI!
+            // TODO - make more errors into warnings
             // TODO - handle comments
             let (first, second) = line.split_once(": ").ok_or(TranspilerError(
                 "Types should be written as <name: type>.".to_string(),
@@ -36,7 +69,7 @@ fn transpile_impl(src: &str, types: &str) -> Result<String, TranspilerError> {
     match ast {
         Some(ast) => {
             let ast = transform_ast(ast);
-            generate_eigen_output(ast, &mut ti_state)
+            generate_eigen_output(ast, &mut ti_state, warnings)
         }
         None => Err(TranspilerError(format!("Error while parsing. {:#?}", err))),
     }
