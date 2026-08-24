@@ -18,3 +18,10 @@ To set parameter and function types, edit `src/main.rs`.
 ### AST
 
 The converter works by creating an abstract syntax tree of the matlab code using [chumsky](https://github.com/zesterer/chumsky), a combinator parser library. This logic is in `src/ml_parser.rs`. The AST is transformed using `src/transform.rs`, which detects normalization, multiplying by a matrix inverse, inline matrix creation, and other high level functionality that eigen implements differently from matlab. The eigen_output is generated with `src/eigen_output.rs`, which maps the AST to the actual eigen C++ syntax. It calls `src/type_inference.rs` to infer types and inserts them as needed.
+
+### WASM Build
+
+```cmd
+cargo build --release --target wasm32-unknown-unknown
+wasm-bindgen .\target\wasm32-unknown-unknown\release\matlab_to_eigen_conv.wasm --out-dir pkg --target web
+```

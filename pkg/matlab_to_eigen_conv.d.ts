@@ -1,13 +1,13 @@
 /* tslint:disable */
 /* eslint-disable */
 
-export function transpile(src: string): string;
+export function transpile(src: string, types: string): string;
 
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 
 export interface InitOutput {
     readonly memory: WebAssembly.Memory;
-    readonly transpile: (a: number, b: number) => [number, number];
+    readonly transpile: (a: number, b: number, c: number, d: number) => [number, number];
     readonly __wbindgen_externrefs: WebAssembly.Table;
     readonly __wbindgen_malloc: (a: number, b: number) => number;
     readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;

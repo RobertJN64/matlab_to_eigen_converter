@@ -252,3 +252,17 @@ pub fn expr_type(
         }
     }
 }
+
+pub fn name_to_type(name: &str) -> (u32, u32) {
+    // TODO - improve error handling
+    match name {
+        "float" | "double" | "int" | "bool" => (1, 1),
+
+        s if let Some(n) = s.strip_prefix("Vector") => (n.parse().unwrap(), 1),
+        s if let Some(dims) = s.strip_prefix("Matrix") => {
+            let (rows, cols) = dims.split_once('_').unwrap();
+            (rows.parse().unwrap(), cols.parse().unwrap())
+        }
+        _ => (0, 0),
+    }
+}
