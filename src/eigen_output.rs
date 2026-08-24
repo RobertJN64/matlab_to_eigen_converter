@@ -1,3 +1,4 @@
+use crate::error::TranspilerError;
 use crate::syntax::*;
 use crate::type_inference::{expr_type, inline_matrix_type, lvalue_type};
 use std::collections::HashMap;
@@ -416,14 +417,13 @@ fn generate_output_for_function(
     function: MLtFunction,
     ti_state: &mut HashMap<String, (u32, u32)>,
     line_num: &mut u32,
-) -> String {
-    format!(
+) -> Result<String, TranspilerError> {
+    // TODO - infer function type from returns, handle multiple returns, etc.
+    Ok(format!(
         "{} {}({}) {{{}return {};\n}}\n",
-        type_to_cpp(
-            *ti_state
-                .get("_self")
-                .expect("ti_state should have `_self` to represent function return type")
-        ),
+        type_to_cpp(*ti_state.get("_self").ok_or(TranspilerError(
+            "Types should have `_self` to represent function return type".to_string()
+        ))?),
         function.name,
         function
             .params
@@ -439,19 +439,19 @@ fn generate_output_for_function(
             .join(", "),
         generate_output_for_statement_list(function.body, ti_state, line_num),
         function.return_obj // TODO - type check this
-    )
+    ))
 }
 
 pub fn generate_eigen_output(
     function: MLtFunction,
     ti_state: &mut HashMap<String, (u32, u32)>,
-) -> String {
+) -> Result<String, TranspilerError> {
     let mut line_num = 3;
     let mut output = String::from("#include \"matlab_funcs.h\"\n\n");
     output.push_str(&generate_output_for_function(
         function,
         ti_state,
         &mut line_num,
-    ));
-    output
+    )?);
+    Ok(output)
 }

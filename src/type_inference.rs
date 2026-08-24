@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use crate::error::InvalidType;
 use crate::syntax::*;
 
 // returns the type (rows, cols) of a matlab expression so the C++ type can be inserted
@@ -253,16 +254,27 @@ pub fn expr_type(
     }
 }
 
-pub fn name_to_type(name: &str) -> (u32, u32) {
-    // TODO - improve error handling
+pub fn name_to_type(name: &str) -> Result<(u32, u32), InvalidType> {
     match name {
-        "float" | "double" | "int" | "bool" => (1, 1),
+        "float" | "double" | "int" | "bool" => Ok((1, 1)),
 
-        s if let Some(n) = s.strip_prefix("Vector") => (n.parse().unwrap(), 1),
-        s if let Some(dims) = s.strip_prefix("Matrix") => {
-            let (rows, cols) = dims.split_once('_').unwrap();
-            (rows.parse().unwrap(), cols.parse().unwrap())
+        s if let Some(n) = s.strip_prefix("Vector") => {
+            let n = n.parse().map_err(|_| InvalidType(name.to_string()))?;
+            Ok((n, 1))
         }
-        _ => (0, 0),
+
+        s if let Some(dims) = s.strip_prefix("Matrix") => {
+            let (rows, cols) = dims
+                .split_once('_')
+                .ok_or_else(|| InvalidType(name.to_string()))?;
+
+            let rows = rows.parse().map_err(|_| InvalidType(name.to_string()))?;
+
+            let cols = cols.parse().map_err(|_| InvalidType(name.to_string()))?;
+
+            Ok((rows, cols))
+        }
+
+        _ => Err(InvalidType(name.to_string())),
     }
 }
