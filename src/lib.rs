@@ -23,6 +23,8 @@ fn transpile_impl(src: &str, types: &str) -> Result<String, TranspilerError> {
     let mut ti_state = HashMap::new();
     for line in types.lines() {
         if !line.trim().is_empty() {
+            // TODO - printed warnings should be visible in UI!
+            // TODO - handle comments
             let (first, second) = line.split_once(": ").ok_or(TranspilerError(
                 "Types should be written as <name: type>.".to_string(),
             ))?;
