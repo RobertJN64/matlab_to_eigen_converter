@@ -50,8 +50,6 @@ pub fn transpile_wrap(src: &str, types: &str) -> TranspilerOutput {
         })
 }
 
-// TODO - make more errors into warnings
-
 fn transpile(src: &str, types: &str, warnings: &mut String) -> Result<String, TranspilerError> {
     let mut ti_state = HashMap::new();
     for line in types.lines() {
@@ -71,7 +69,7 @@ fn transpile(src: &str, types: &str, warnings: &mut String) -> Result<String, Tr
     match ast {
         Some(ast) => {
             let ast = transform_ast(ast);
-            generate_eigen_output(ast, &mut ti_state, warnings)
+            Ok(generate_eigen_output(ast, &mut ti_state, warnings))
         }
         None => Err(TranspilerError(format!("Error while parsing. {:#?}", err))),
     }

@@ -294,8 +294,30 @@ pub fn expr_type(
                 MLtBinOp::CwiseMul | MLtBinOp::CwiseDiv => {
                     expr_type(left, ti_state, line_num, warnings)?
                 }
-                MLtBinOp::And | MLtBinOp::Or => (1, 1), // float is basically a bool - TODO - check that inputs are bools
-                MLtBinOp::EqualTo | MLtBinOp::NotEqualTo => (1, 1), // float is basically a bool - TODO - check that input shapes match
+                MLtBinOp::And | MLtBinOp::Or => {
+                    let (lrows, lcols) = expr_type(left, ti_state, line_num, warnings)?;
+                    let (rrows, rcols) = expr_type(right, ti_state, line_num, warnings)?;
+                    if lrows != 1 || lcols != 1 || rrows != 1 || rcols != 1 {
+                        let _ = writeln!(
+                            warnings,
+                            "Warning: && and || should have bool should have bool inputs on line {}.",
+                            line_num
+                        );
+                    }
+                    (1, 1) // float is basically a bool
+                }
+                MLtBinOp::EqualTo | MLtBinOp::NotEqualTo => {
+                    let (lrows, lcols) = expr_type(left, ti_state, line_num, warnings)?;
+                    let (rrows, rcols) = expr_type(right, ti_state, line_num, warnings)?;
+                    if lrows != rrows || lcols != rcols {
+                        let _ = writeln!(
+                            warnings,
+                            "Matrix comparison type warning: {} by {} compare to {} by {} on line {}.",
+                            lrows, lcols, rrows, rcols, line_num
+                        );
+                    }
+                    (1, 1) // float is basically a bool
+                }
                 MLtBinOp::LessThan
                 | MLtBinOp::LessThanEqualTo
                 | MLtBinOp::GreaterThan

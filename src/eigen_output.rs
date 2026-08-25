@@ -430,7 +430,7 @@ fn generate_output_for_statement(
                     &mut ti_state.clone(),
                     line_num,
                     warnings
-                )?
+                )
             );
             text
         }
@@ -451,11 +451,18 @@ fn generate_output_for_statement_list(
     ti_state: &mut HashMap<String, (u32, u32)>,
     line_num: &mut u32,
     warnings: &mut String,
-) -> Result<String, TranspilerError> {
-    // TODO - just fail a single statement
+) -> String {
+    // TODO - better error context, better error types
+    // TODO - better parsing errors
+    // TODO - better indent
     statement_list
         .into_iter()
-        .map(|s| generate_output_for_statement(s, ti_state, line_num, warnings))
+        .map(|s| {
+            generate_output_for_statement(s, ti_state, line_num, warnings).unwrap_or_else(|e| {
+                let _ = writeln!(warnings, "{}", e.0.to_string());
+                format!("/* {} */", e.0.to_string())
+            })
+        })
         .collect()
 }
 
@@ -464,13 +471,11 @@ fn generate_output_for_function(
     ti_state: &mut HashMap<String, (u32, u32)>,
     line_num: &mut u32,
     warnings: &mut String,
-) -> Result<String, TranspilerError> {
+) -> String {
     // TODO - infer function type from returns, handle multiple returns, etc.
-    Ok(format!(
+    format!(
         "{} {}({}) {{{}return {};\n}}\n",
-        type_to_cpp(*ti_state.get("_self").ok_or(TranspilerError(
-            "Types should have `_self` to represent function return type".to_string()
-        ))?),
+        type_to_cpp(*ti_state.get("_self").unwrap_or(&(0, 0))),
         function.name,
         function
             .params
@@ -484,16 +489,16 @@ fn generate_output_for_function(
             })
             .collect::<Vec<String>>()
             .join(", "),
-        generate_output_for_statement_list(function.body, ti_state, line_num, warnings)?,
+        generate_output_for_statement_list(function.body, ti_state, line_num, warnings),
         function.return_obj // TODO - type check this
-    ))
+    )
 }
 
 pub fn generate_eigen_output(
     function: MLtFunction,
     ti_state: &mut HashMap<String, (u32, u32)>,
     warnings: &mut String,
-) -> Result<String, TranspilerError> {
+) -> String {
     let mut line_num = 3;
     let mut output = String::from("#include \"matlab_funcs.h\"\n\n");
     output.push_str(&generate_output_for_function(
@@ -501,6 +506,6 @@ pub fn generate_eigen_output(
         ti_state,
         &mut line_num,
         warnings,
-    )?);
-    Ok(output)
+    ));
+    output
 }
