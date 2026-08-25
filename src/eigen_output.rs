@@ -51,7 +51,7 @@ fn function_to_dot_function(
     ti_state: &mut HashMap<String, (u32, u32)>,
     line_num: &mut u32,
     warnings: &mut String,
-) -> String {
+) -> Result<String, TranspilerError> {
     let fname_map = HashMap::from([
         ("diag", "asDiagonal()"),
         ("abs", "cwiseAbs()"),
@@ -61,25 +61,22 @@ fn function_to_dot_function(
     let dot_name = fname_map
         .get(function_name)
         .expect(format!("missing {} in dot_name map", function_name).as_str());
-    match function_params.as_slice() {
-        [MLtExpr::Basic(lvalue)] => {
-            format!(
-                "{}.{}",
-                lvalue_to_cpp(lvalue.clone(), ti_state, line_num, warnings),
-                dot_name
-            )
-        }
-        [expr] => {
-            format!(
-                "({}).{}",
-                expr_to_cpp(expr.clone(), ti_state, line_num, warnings),
-                dot_name
-            )
-        }
-        _ => {
-            panic!("{} must have exactly 1 arg", function_name)
-        }
-    }
+    Ok(match function_params.as_slice() {
+        [MLtExpr::Basic(lvalue)] => format!(
+            "{}.{}",
+            lvalue_to_cpp(lvalue.clone(), ti_state, line_num, warnings)?,
+            dot_name
+        ),
+        [expr] => format!(
+            "({}).{}",
+            expr_to_cpp(expr.clone(), ti_state, line_num, warnings)?,
+            dot_name
+        ),
+        _ => Err(TranspilerError(format!(
+            "Error: {} must have exactly 1 arg",
+            function_name
+        )))?,
+    })
 }
 
 fn function_call_to_cpp(
@@ -88,48 +85,70 @@ fn function_call_to_cpp(
     ti_state: &mut HashMap<String, (u32, u32)>,
     line_num: &mut u32,
     warnings: &mut String,
-) -> String {
-    match function_name.as_str() {
+) -> Result<String, TranspilerError> {
+    Ok(match function_name.as_str() {
         "eye" => {
             if let Some(MLtExpr::Basic(MLtLValue::Integer(n))) = function_params.get(0) {
-                let n = n.parse().expect("Argument to eye must be an int");
+                let n = n.parse().map_err(|_| {
+                    TranspilerError("Error: argument to eye must be an int.".to_string())
+                })?;
                 format!("{}::Identity()", type_to_cpp((n, n)))
             } else {
-                panic!("eye expects one integer argument");
+                Err(TranspilerError(
+                    "Error: eye expects one integer argument.".to_string(),
+                ))?
             }
         }
         "zeros" => {
             if let Some(MLtExpr::Basic(MLtLValue::Integer(rows))) = function_params.get(0) {
                 if let Some(MLtExpr::Basic(MLtLValue::Integer(cols))) = function_params.get(1) {
-                    let rows = rows.parse().expect("Argument to zeros must be an int");
-                    let cols = cols.parse().expect("Argument to zeros must be an int");
-                    return format!("{}::Zero()", type_to_cpp((rows, cols)));
+                    let rows = rows.parse().map_err(|_| {
+                        TranspilerError("Error: argument to zeros must be an int.".to_string())
+                    })?;
+                    let cols = cols.parse().map_err(|_| {
+                        TranspilerError("Error: argument to zeros must be an int.".to_string())
+                    })?;
+                    format!("{}::Zero()", type_to_cpp((rows, cols)))
                 } else {
-                    let rows_cols = rows.parse().expect("Argument to zeros must be an int");
-                    return format!("{}::Zero()", type_to_cpp((rows_cols, rows_cols)));
+                    let rows_cols = rows.parse().map_err(|_| {
+                        TranspilerError("Error: argument to zeros must be an int.".to_string())
+                    })?;
+                    format!("{}::Zero()", type_to_cpp((rows_cols, rows_cols)))
                 }
+            } else {
+                Err(TranspilerError(
+                    "Error: zeros expects one or two integer arguments.".to_string(),
+                ))?
             }
-            panic!("zeros expects two integer arguments");
         }
         "ones" => {
             if let Some(MLtExpr::Basic(MLtLValue::Integer(rows))) = function_params.get(0) {
                 if let Some(MLtExpr::Basic(MLtLValue::Integer(cols))) = function_params.get(1) {
-                    let rows = rows.parse().expect("Argument to ones must be an int");
-                    let cols = cols.parse().expect("Argument to ones must be an int");
-                    return format!("{}::Ones()", type_to_cpp((rows, cols)));
+                    let rows = rows.parse().map_err(|_| {
+                        TranspilerError("Error: argument to ones must be an int.".to_string())
+                    })?;
+                    let cols = cols.parse().map_err(|_| {
+                        TranspilerError("Error: argument to ones must be an int.".to_string())
+                    })?;
+                    format!("{}::Ones()", type_to_cpp((rows, cols)))
                 } else {
-                    let rows_cols = rows.parse().expect("Argument to ones must be an int");
-                    return format!("{}::Ones()", type_to_cpp((rows_cols, rows_cols)));
+                    let rows_cols = rows.parse().map_err(|_| {
+                        TranspilerError("Error: argument to ones must be an int.".to_string())
+                    })?;
+                    format!("{}::Ones()", type_to_cpp((rows_cols, rows_cols)))
                 }
+            } else {
+                Err(TranspilerError(
+                    "Error: ones expects one or two integer arguments.".to_string(),
+                ))?
             }
-            panic!("ones expects two integer arguments");
         }
         "expm" => format!(
             "matrixExpPade6({})",
             function_params
                 .into_iter()
                 .map(|p| expr_to_cpp(p, ti_state, line_num, warnings))
-                .collect::<Vec<_>>()
+                .collect::<Result<Vec<_>, _>>()?
                 .join(", ")
         ),
         "diag" | "abs" | "norm" | "exp" => function_to_dot_function(
@@ -138,42 +157,48 @@ fn function_call_to_cpp(
             ti_state,
             line_num,
             warnings,
-        ),
+        )?,
         "min" => {
             if let Some(mlt_expr_l) = function_params.get(0) {
                 if let Some(mlt_expr_r) = function_params.get(1) {
-                    return format!(
+                    return Ok(format!(
                         "{}.cwiseMin({})",
-                        expr_to_cpp(mlt_expr_l.clone(), ti_state, line_num, warnings),
-                        expr_to_cpp(mlt_expr_r.clone(), ti_state, line_num, warnings)
-                    );
+                        expr_to_cpp(mlt_expr_l.clone(), ti_state, line_num, warnings)?,
+                        expr_to_cpp(mlt_expr_r.clone(), ti_state, line_num, warnings)?
+                    ));
                 }
             }
-            panic!("min expects two arguments");
+            return Err(TranspilerError(
+                "Error: min expects two arguments.".to_string(),
+            ));
         }
         "max" => {
             if let Some(mlt_expr_l) = function_params.get(0) {
                 if let Some(mlt_expr_r) = function_params.get(1) {
-                    return format!(
+                    return Ok(format!(
                         "{}.cwiseMax({})",
-                        expr_to_cpp(mlt_expr_l.clone(), ti_state, line_num, warnings),
-                        expr_to_cpp(mlt_expr_r.clone(), ti_state, line_num, warnings)
-                    );
+                        expr_to_cpp(mlt_expr_l.clone(), ti_state, line_num, warnings)?,
+                        expr_to_cpp(mlt_expr_r.clone(), ti_state, line_num, warnings)?
+                    ));
                 }
             }
-            panic!("max expects two arguments");
+            return Err(TranspilerError(
+                "Error: max expects two arguments.".to_string(),
+            ));
         }
         "cross" => {
             if let Some(mlt_expr_l) = function_params.get(0) {
                 if let Some(mlt_expr_r) = function_params.get(1) {
-                    return format!(
+                    return Ok(format!(
                         "{}.cross({})",
-                        expr_to_cpp(mlt_expr_l.clone(), ti_state, line_num, warnings),
-                        expr_to_cpp(mlt_expr_r.clone(), ti_state, line_num, warnings)
-                    );
+                        expr_to_cpp(mlt_expr_l.clone(), ti_state, line_num, warnings)?,
+                        expr_to_cpp(mlt_expr_r.clone(), ti_state, line_num, warnings)?
+                    ));
                 }
             }
-            panic!("cross expects two arguments");
+            return Err(TranspilerError(
+                "Error: cross expects two arguments.".to_string(),
+            ));
         }
         _ => format!(
             "{}({})",
@@ -181,10 +206,10 @@ fn function_call_to_cpp(
             function_params
                 .into_iter()
                 .map(|p| expr_to_cpp(p, ti_state, line_num, warnings))
-                .collect::<Vec<_>>()
+                .collect::<Result<Vec<_>, _>>()?
                 .join(", ")
         ),
-    }
+    })
 }
 
 fn lvalue_to_cpp(
@@ -192,22 +217,24 @@ fn lvalue_to_cpp(
     ti_state: &mut HashMap<String, (u32, u32)>,
     line_num: &mut u32,
     warnings: &mut String,
-) -> String {
+) -> Result<String, TranspilerError> {
     match lvalue {
-        MLtLValue::Integer(val) | MLtLValue::Float(val) => format!("{}", val),
-        MLtLValue::Matrix(matrix) => matrix_to_cpp(matrix),
+        MLtLValue::Integer(val) | MLtLValue::Float(val) => Ok(format!("{}", val)),
+        MLtLValue::Matrix(matrix) => Ok(matrix_to_cpp(matrix)),
         MLtLValue::StructMatrix(struct_name, matrix) => {
-            format!("{}.{}", struct_name, matrix_to_cpp(matrix))
+            Ok(format!("{}.{}", struct_name, matrix_to_cpp(matrix)))
         }
-        MLtLValue::InlineMatrix(mlt_exprs) => format!(
+        MLtLValue::InlineMatrix(mlt_exprs) => Ok(format!(
             "({}() << {}).finished()",
-            type_to_cpp(inline_matrix_type(&mlt_exprs, ti_state, line_num, warnings)),
+            type_to_cpp(inline_matrix_type(
+                &mlt_exprs, ti_state, line_num, warnings
+            )?),
             mlt_exprs
                 .into_iter()
                 .map(|v| expr_to_cpp(v, ti_state, line_num, warnings))
-                .collect::<Vec<_>>()
+                .collect::<Result<Vec<_>, _>>()?
                 .join(", ")
-        ),
+        )),
         MLtLValue::FunctionCall(function_name, function_params) => {
             function_call_to_cpp(function_name, function_params, ti_state, line_num, warnings)
         }
@@ -240,86 +267,87 @@ fn expr_to_cpp(
     ti_state: &mut HashMap<String, (u32, u32)>,
     line_num: &mut u32,
     warnings: &mut String,
-) -> String {
-    match expr {
-        MLtExpr::Basic(mlt_lvalue) => lvalue_to_cpp(mlt_lvalue, ti_state, line_num, warnings),
+) -> Result<String, TranspilerError> {
+    Ok(match expr {
+        MLtExpr::Basic(mlt_lvalue) => lvalue_to_cpp(mlt_lvalue, ti_state, line_num, warnings)?,
         MLtExpr::Negation(mlt_expr) => {
-            format!("-{}", expr_to_cpp(*mlt_expr, ti_state, line_num, warnings))
+            format!("-{}", expr_to_cpp(*mlt_expr, ti_state, line_num, warnings)?)
         }
-        MLtExpr::Transposed(mlt_expr) => {
-            format!(
-                "{}.transpose()",
-                expr_to_cpp(*mlt_expr, ti_state, line_num, warnings)
-            )
-        }
-        MLtExpr::Parenthesized(mlt_expr) => {
-            format!("({})", expr_to_cpp(*mlt_expr, ti_state, line_num, warnings))
-        }
+        MLtExpr::Transposed(mlt_expr) => format!(
+            "{}.transpose()",
+            expr_to_cpp(*mlt_expr, ti_state, line_num, warnings)?
+        ),
+        MLtExpr::Parenthesized(mlt_expr) => format!(
+            "({})",
+            expr_to_cpp(*mlt_expr, ti_state, line_num, warnings)?
+        ),
         MLtExpr::BinOp(mlt_exprl, mlt_bin_op, mlt_exprr) => {
             // if dividing by a matrix mul by the inverse instead
             match mlt_bin_op {
                 MLtBinOp::Div => {
-                    if expr_type(&mlt_exprr, ti_state, line_num, warnings) != (1, 1) {
+                    if expr_type(&mlt_exprr, ti_state, line_num, warnings)? != (1, 1) {
                         format!(
                             "{} * {}.inverse()",
-                            expr_to_cpp(*mlt_exprl, ti_state, line_num, warnings),
-                            expr_to_cpp(*mlt_exprr, ti_state, line_num, warnings)
+                            expr_to_cpp(*mlt_exprl, ti_state, line_num, warnings)?,
+                            expr_to_cpp(*mlt_exprr, ti_state, line_num, warnings)?
                         )
                     } else {
                         format!(
                             "{} {} {}",
-                            expr_to_cpp(*mlt_exprl, ti_state, line_num, warnings),
+                            expr_to_cpp(*mlt_exprl, ti_state, line_num, warnings)?,
                             binop_to_cpp(mlt_bin_op),
-                            expr_to_cpp(*mlt_exprr, ti_state, line_num, warnings)
+                            expr_to_cpp(*mlt_exprr, ti_state, line_num, warnings)?
                         )
                     }
                 }
                 MLtBinOp::Pow => {
                     format!(
                         "pow({}, {})",
-                        expr_to_cpp(*mlt_exprl, ti_state, line_num, warnings),
-                        expr_to_cpp(*mlt_exprr, ti_state, line_num, warnings)
+                        expr_to_cpp(*mlt_exprl, ti_state, line_num, warnings)?,
+                        expr_to_cpp(*mlt_exprr, ti_state, line_num, warnings)?
                     )
                 }
                 MLtBinOp::CwiseMul => {
                     format!(
                         "{}.cwiseProduct({})",
-                        expr_to_cpp(*mlt_exprl, ti_state, line_num, warnings),
-                        expr_to_cpp(*mlt_exprr, ti_state, line_num, warnings)
+                        expr_to_cpp(*mlt_exprl, ti_state, line_num, warnings)?,
+                        expr_to_cpp(*mlt_exprr, ti_state, line_num, warnings)?
                     )
                 }
                 MLtBinOp::CwiseDiv => {
                     format!(
                         "{}.cwiseQuotient({})",
-                        expr_to_cpp(*mlt_exprl, ti_state, line_num, warnings),
-                        expr_to_cpp(*mlt_exprr, ti_state, line_num, warnings)
+                        expr_to_cpp(*mlt_exprl, ti_state, line_num, warnings)?,
+                        expr_to_cpp(*mlt_exprr, ti_state, line_num, warnings)?
                     )
                 }
                 MLtBinOp::CwisePow => {
                     match *mlt_exprr {
                         MLtExpr::Basic(MLtLValue::Integer(v)) => {
                             if v == "2" {
-                                return format!(
+                                return Ok(format!(
                                     "{}.cwiseAbs2()",
-                                    expr_to_cpp(*mlt_exprl, ti_state, line_num, warnings),
-                                );
+                                    expr_to_cpp(*mlt_exprl, ti_state, line_num, warnings)?,
+                                ));
                             }
                         }
                         _ => {}
                     }
-                    panic!("CwisePow only supports .^2");
+                    Err(TranspilerError(
+                        "Error: CwisePow only supports .^2".to_string(),
+                    ))?
                 }
                 _ => {
                     format!(
                         "{} {} {}",
-                        expr_to_cpp(*mlt_exprl, ti_state, line_num, warnings),
+                        expr_to_cpp(*mlt_exprl, ti_state, line_num, warnings)?,
                         binop_to_cpp(mlt_bin_op),
-                        expr_to_cpp(*mlt_exprr, ti_state, line_num, warnings)
+                        expr_to_cpp(*mlt_exprr, ti_state, line_num, warnings)?
                     )
                 }
             }
         }
-    }
+    })
 }
 
 fn matrix_access_should_have_type(matrix: &MLtMatrixAccess) -> bool {
@@ -349,13 +377,13 @@ fn generate_output_for_statement(
     ti_state: &mut HashMap<String, (u32, u32)>,
     line_num: &mut u32,
     warnings: &mut String,
-) -> String {
-    match statement {
+) -> Result<String, TranspilerError> {
+    Ok(match statement {
         MLtStatement::Assignment(lvalue, expr) => {
             let simple_matrix = lvalue_is_simple_matrix(&lvalue); // we don't place types on matrix accesses
-            let left_side_cpp = lvalue_to_cpp(lvalue.clone(), ti_state, line_num, warnings);
-            let right_side_type = expr_type(&expr, ti_state, line_num, warnings);
-            let right_side_cpp = expr_to_cpp(expr, ti_state, line_num, warnings);
+            let left_side_cpp = lvalue_to_cpp(lvalue.clone(), ti_state, line_num, warnings)?;
+            let right_side_type = expr_type(&expr, ti_state, line_num, warnings)?;
+            let right_side_cpp = expr_to_cpp(expr, ti_state, line_num, warnings)?;
 
             // don't apply type if we already have a type recorded
             if simple_matrix && !ti_state.contains_key(&left_side_cpp) {
@@ -367,7 +395,7 @@ fn generate_output_for_statement(
                     right_side_cpp
                 )
             } else {
-                let left_side_type = lvalue_type(&lvalue, ti_state, line_num, warnings);
+                let left_side_type = lvalue_type(&lvalue, ti_state, line_num, warnings)?;
                 if left_side_type != right_side_type {
                     let _ = writeln!(
                         warnings,
@@ -382,9 +410,7 @@ fn generate_output_for_statement(
                 format!("{} = {};", left_side_cpp, right_side_cpp)
             }
         }
-        MLtStatement::Normalization(matrix_name) => {
-            format!("{}.normalize();", matrix_name)
-        }
+        MLtStatement::Normalization(matrix_name) => format!("{}.normalize();", matrix_name),
         MLtStatement::Persistent(idents) => {
             *line_num += 1;
             format!(
@@ -396,20 +422,18 @@ fn generate_output_for_statement(
             *line_num += 1;
             let text = format!(
                 "if ({}) {{\n{}}}",
-                expr_to_cpp(mlt_expr, ti_state, line_num, warnings),
+                expr_to_cpp(mlt_expr, ti_state, line_num, warnings)?,
                 // clone ti_state here to prevent types from propagating outside the if statement
                 generate_output_for_statement_list(
                     mlt_statements,
                     &mut ti_state.clone(),
                     line_num,
                     warnings
-                )
+                )?
             );
             text
         }
-        MLtStatement::Comment(comment_str) => {
-            format!("// {}", comment_str)
-        }
+        MLtStatement::Comment(comment_str) => format!("// {}", comment_str),
         MLtStatement::Error(error_str) => {
             println!("Error line: {}", error_str);
             format!("// {}; // line could not be parsed", error_str)
@@ -418,7 +442,7 @@ fn generate_output_for_statement(
             *line_num += 1;
             format!("\n")
         }
-    }
+    })
 }
 
 fn generate_output_for_statement_list(
@@ -426,7 +450,8 @@ fn generate_output_for_statement_list(
     ti_state: &mut HashMap<String, (u32, u32)>,
     line_num: &mut u32,
     warnings: &mut String,
-) -> String {
+) -> Result<String, TranspilerError> {
+    // TODO - just fail a single statement
     statement_list
         .into_iter()
         .map(|s| generate_output_for_statement(s, ti_state, line_num, warnings))
@@ -458,7 +483,7 @@ fn generate_output_for_function(
             })
             .collect::<Vec<String>>()
             .join(", "),
-        generate_output_for_statement_list(function.body, ti_state, line_num, warnings),
+        generate_output_for_statement_list(function.body, ti_state, line_num, warnings)?,
         function.return_obj // TODO - type check this
     ))
 }
