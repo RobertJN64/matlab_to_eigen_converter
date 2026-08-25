@@ -28,6 +28,7 @@ fn matrix_to_cpp(matrix: MLtMatrixAccess) -> String {
             )
         }
         MLtMatrixAccess::MatrixMultiSegment(_, _) => {
+            // panic() guaranteed by transform logic
             panic!("MatrixMultiSegment should be converted to an inline matrix")
         }
         MLtMatrixAccess::MatrixBlock(ident, mlt_range_l, mlt_range_r) => {
@@ -435,7 +436,7 @@ fn generate_output_for_statement(
         }
         MLtStatement::Comment(comment_str) => format!("// {}", comment_str),
         MLtStatement::Error(error_str) => {
-            println!("Error line: {}", error_str);
+            let _ = writeln!(warnings, "Error parsing line: {}.", error_str);
             format!("// {}; // line could not be parsed", error_str)
         }
         MLtStatement::NewLine => {

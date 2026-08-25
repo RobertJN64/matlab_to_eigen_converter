@@ -103,6 +103,7 @@ fn matrix_type(
             (mlt_range.end - mlt_range.start + 1, 1)
         }
         MLtMatrixAccess::MatrixMultiSegment(_, _) => {
+            // panic() guaranteed by transform logic
             panic!("MatrixMultiSegment should be converted to an inline matrix")
         }
         MLtMatrixAccess::MatrixBlock(name, row_range, col_range) => {
