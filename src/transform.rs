@@ -1,7 +1,5 @@
 use crate::syntax::*;
 
-// TODO - reject assigning to integer or function
-
 pub fn transform_matrix_multisegment(value: MLtValue) -> MLtValue {
     match value.clone() {
         MLtValue::Matrix(mlt_matrix_access) => {

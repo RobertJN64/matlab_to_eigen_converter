@@ -8,8 +8,8 @@ use crate::syntax::*;
 
 pub fn inline_matrix_type(
     exprs: &Vec<MLtExpr>,
-    ti_state: &mut HashMap<String, (u32, u32)>,
-    line_num: &mut u32,
+    ti_state: &HashMap<String, (u32, u32)>,
+    line_num: &u32,
     warnings: &mut String,
 ) -> Result<(u32, u32), TranspilerError> {
     let (mut rows, cols) = expr_type(
@@ -38,7 +38,7 @@ pub fn inline_matrix_type(
 fn matrix_type(
     prefix: &str,
     matrix: &MLtMatrixAccess,
-    ti_state: &mut HashMap<String, (u32, u32)>,
+    ti_state: &HashMap<String, (u32, u32)>,
     warnings: &mut String,
 ) -> Result<(u32, u32), TranspilerError> {
     Ok(match matrix {
@@ -132,8 +132,8 @@ fn matrix_type(
 
 pub fn value_type(
     value: &MLtValue,
-    ti_state: &mut HashMap<String, (u32, u32)>,
-    line_num: &mut u32,
+    ti_state: &HashMap<String, (u32, u32)>,
+    line_num: &u32,
     warnings: &mut String,
 ) -> Result<(u32, u32), TranspilerError> {
     Ok(match value {
@@ -217,8 +217,8 @@ pub fn value_type(
 
 pub fn expr_type(
     expr: &MLtExpr,
-    ti_state: &mut HashMap<String, (u32, u32)>,
-    line_num: &mut u32,
+    ti_state: &HashMap<String, (u32, u32)>,
+    line_num: &u32,
     warnings: &mut String,
 ) -> Result<(u32, u32), TranspilerError> {
     Ok(match expr {

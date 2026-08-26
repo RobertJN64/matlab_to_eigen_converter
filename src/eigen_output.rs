@@ -50,8 +50,8 @@ fn matrix_to_cpp(matrix: MLtMatrixAccess) -> String {
 fn function_to_dot_function(
     function_name: &str,
     function_params: Vec<MLtExpr>,
-    ti_state: &mut HashMap<String, (u32, u32)>,
-    line_num: &mut u32,
+    ti_state: &HashMap<String, (u32, u32)>,
+    line_num: &u32,
     warnings: &mut String,
 ) -> Result<String, TranspilerError> {
     let fname_map = HashMap::from([
@@ -85,8 +85,8 @@ fn function_to_dot_function(
 fn function_to_chain_function(
     function_name: &str,
     function_params: Vec<MLtExpr>,
-    ti_state: &mut HashMap<String, (u32, u32)>,
-    line_num: &mut u32,
+    ti_state: &HashMap<String, (u32, u32)>,
+    line_num: &u32,
     warnings: &mut String,
 ) -> Result<String, TranspilerError> {
     let fname_map = HashMap::from([("min", "cwiseMin"), ("max", "cwiseMax"), ("cross", "cross")]);
@@ -121,8 +121,8 @@ fn function_to_chain_function(
 fn function_call_to_cpp(
     function_name: String,
     function_params: Vec<MLtExpr>,
-    ti_state: &mut HashMap<String, (u32, u32)>,
-    line_num: &mut u32,
+    ti_state: &HashMap<String, (u32, u32)>,
+    line_num: &u32,
     warnings: &mut String,
 ) -> Result<String, TranspilerError> {
     // when we call type inference again, use this to prevent duplicate warnings
@@ -198,8 +198,8 @@ fn function_call_to_cpp(
 
 fn value_to_cpp(
     value: MLtValue,
-    ti_state: &mut HashMap<String, (u32, u32)>,
-    line_num: &mut u32,
+    ti_state: &HashMap<String, (u32, u32)>,
+    line_num: &u32,
     warnings: &mut String,
 ) -> Result<String, TranspilerError> {
     match value {
@@ -249,8 +249,8 @@ fn binop_to_cpp(binop: MLtBinOp) -> &'static str {
 
 fn expr_to_cpp(
     expr: MLtExpr,
-    ti_state: &mut HashMap<String, (u32, u32)>,
-    line_num: &mut u32,
+    ti_state: &HashMap<String, (u32, u32)>,
+    line_num: &u32,
     warnings: &mut String,
 ) -> Result<String, TranspilerError> {
     Ok(match expr {
