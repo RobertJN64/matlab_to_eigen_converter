@@ -16,7 +16,7 @@ fn sident<'src>() -> impl Parser<'src, &'src str, String> + Clone {
     ident().map(String::from)
 }
 
-pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFunction> {
+pub fn parser<'src>() -> impl Parser<'src, &'src str, Vec<MLtFile>> {
     let mlt_range = int(10)
         .then_ignore(kw(":"))
         .then(int(10))
@@ -198,7 +198,7 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFunction> {
             .map(MLtStatement::Error),
     )));
 
-    let mlt_function_header = kw("function")
+    let mlt_function_header = kw_no_newline("function")
         .ignore_then(sident())
         .then_ignore(kw("="))
         .then(sident())
@@ -210,8 +210,8 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFunction> {
         );
 
     let mlt_function = mlt_function_header
-        .then(mlt_statement.repeated().collect())
-        .then_ignore(kw("end"))
+        .then(mlt_statement.clone().repeated().collect())
+        .then_ignore(kw_no_newline("end"))
         .map(|(((return_obj, name), params), body)| MLtFunction {
             return_obj,
             name,
@@ -219,5 +219,12 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFunction> {
             body,
         });
 
-    return mlt_function;
+    let mlt_file = choice((
+        mlt_function.map(MLtFile::Function),
+        mlt_statement.map(MLtFile::Statement),
+    ))
+    .repeated()
+    .collect();
+
+    return mlt_file;
 }

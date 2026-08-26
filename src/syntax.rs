@@ -1,5 +1,10 @@
-// TODO - allow top level statements
-// TODO - ident output
+// TODO - unit tests
+
+#[derive(Clone, Debug)]
+pub enum MLtFile {
+    Statement(MLtStatement),
+    Function(MLtFunction),
+}
 
 #[derive(Clone, Debug)]
 pub struct MLtFunction {

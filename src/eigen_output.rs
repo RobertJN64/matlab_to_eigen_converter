@@ -472,7 +472,7 @@ fn generate_output_for_function(
 ) -> String {
     // TODO - infer function type from returns, handle multiple returns, etc.
     format!(
-        "{} {}({}) {{{}return {};\n}}\n",
+        "{} {}({}) {{{}return {};\n}}",
         type_to_cpp(*ti_state.get("_self").unwrap_or(&(0, 0))),
         function.name,
         function
@@ -493,17 +493,29 @@ fn generate_output_for_function(
 }
 
 pub fn generate_eigen_output(
-    function: MLtFunction,
+    file: Vec<MLtFile>,
     ti_state: &mut HashMap<String, (u32, u32)>,
     warnings: &mut String,
 ) -> String {
     let mut line_num = 3;
     let mut output = String::from("#include \"matlab_funcs.h\"\n\n");
-    output.push_str(&generate_output_for_function(
-        function,
-        ti_state,
-        &mut line_num,
-        warnings,
-    ));
+    output.push_str(
+        &file
+            .into_iter()
+            .map(|f| match f {
+                MLtFile::Statement(mlt_statement) => {
+                    generate_output_for_statement(mlt_statement, ti_state, &mut line_num, warnings)
+                        .unwrap_or_else(|e| {
+                            let _ = writeln!(warnings, "{}", e.0.to_string());
+                            format!("/* {} */", e.0.to_string())
+                        })
+                }
+                MLtFile::Function(mlt_function) => {
+                    generate_output_for_function(mlt_function, ti_state, &mut line_num, warnings)
+                }
+            })
+            .collect::<Vec<String>>()
+            .join(""),
+    );
     output
 }

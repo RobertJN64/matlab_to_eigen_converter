@@ -143,14 +143,34 @@ fn transform_statement(
     statement
 }
 
-pub fn transform_ast(mut function: MLtFunction) -> MLtFunction {
+pub fn transform_function(function: MLtFunction) -> MLtFunction {
     let mut persistent_params = vec![];
-    function.body = function
-        .body
-        .into_iter()
-        .map(|s| transform_statement(s, &mut persistent_params))
-        .collect();
-    function.params.extend(persistent_params);
+    let mut new_function = MLtFunction {
+        return_obj: function.return_obj,
+        name: function.name,
+        body: function
+            .body
+            .into_iter()
+            .map(|s| transform_statement(s, &mut persistent_params))
+            .collect(),
+        params: function.params,
+    };
+    new_function.params.extend(persistent_params);
 
-    function
+    new_function
+}
+
+pub fn transform_ast(file: Vec<MLtFile>) -> Vec<MLtFile> {
+    // persistent params don't make sense at a top level so just collect them here
+    let mut not_persistent_params = Vec::new();
+
+    file.into_iter()
+        .map(|f| match f {
+            MLtFile::Statement(mlt_statement) => MLtFile::Statement(transform_statement(
+                mlt_statement,
+                &mut not_persistent_params,
+            )),
+            MLtFile::Function(mlt_function) => MLtFile::Function(transform_function(mlt_function)),
+        })
+        .collect()
 }
