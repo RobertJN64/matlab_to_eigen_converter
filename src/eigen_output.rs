@@ -189,7 +189,11 @@ fn function_call_to_cpp(
             function_name,
             function_params
                 .into_iter()
-                .map(|p| expr_to_cpp(p, ti_state, line_num, warnings))
+                .map(|p| {
+                    // call expr_type here to get any type warnings
+                    let _ = expr_type(&p, ti_state, line_num, warnings);
+                    expr_to_cpp(p, ti_state, line_num, warnings)
+                })
                 .collect::<Result<Vec<_>, _>>()?
                 .join(", ")
         ),
