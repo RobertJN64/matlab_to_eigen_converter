@@ -144,47 +144,42 @@ pub fn value_type(
         }
         MLtValue::InlineMatrix(values) => inline_matrix_type(values, ti_state, line_num, warnings)?,
         MLtValue::FunctionCall(function_name, function_params) => match function_name.as_str() {
-            "eye" => {
-                if let Some(MLtExpr::Basic(MLtValue::Integer(n))) = function_params.get(0) {
-                    let n = n.parse().map_err(|_| {
-                        TranspilerError("Error: argument to eye must be an int.".to_string())
-                    })?;
-                    (n, n)
-                } else {
-                    Err(TranspilerError(
-                        "Type Deduction Error: eye expects one integer argument.".to_string(),
-                    ))?
-                }
-            }
-            "ones" | "zeros" => {
-                if let Some(MLtExpr::Basic(MLtValue::Integer(rows))) = function_params.get(0) {
-                    if let Some(MLtExpr::Basic(MLtValue::Integer(cols))) = function_params.get(1) {
-                        let rows = rows.parse().map_err(|_| {
-                            TranspilerError(
-                                "Error: argument to ones|zeros must be an int.".to_string(),
-                            )
-                        })?;
-                        let cols = cols.parse().map_err(|_| {
-                            TranspilerError(
-                                "Error: argument to ones|zeros must be an int.".to_string(),
-                            )
-                        })?;
-                        (rows, cols)
-                    } else {
-                        let rows_cols = rows.parse().map_err(|_| {
-                            TranspilerError(
-                                "Error: argument to ones|zeros must be an int.".to_string(),
-                            )
-                        })?;
-                        (rows_cols, rows_cols)
+            "eye" => match function_params.as_slice() {
+                [MLtExpr::Basic(MLtValue::Integer(n)), ..] => {
+                    if function_params.len() > 1 {
+                        let _ = writeln!(
+                            warnings,
+                            "Builtin function warning: ignoring extra arguments provided to {} on line {}.",
+                            function_name, line_num
+                        );
                     }
-                } else {
-                    Err(TranspilerError(
-                        "Type Deduction Error: ones|zeros expects one or two integer arguments."
-                            .to_string(),
-                    ))?
+                    (*n, *n)
                 }
-            }
+                _ => Err(TranspilerError(
+                    "Type Deduction Error: eye expects one integer argument.".to_string(),
+                ))?,
+            },
+            "ones" | "zeros" => match function_params.as_slice() {
+                [
+                    MLtExpr::Basic(MLtValue::Integer(rows)),
+                    MLtExpr::Basic(MLtValue::Integer(cols)),
+                    ..,
+                ] => {
+                    if function_params.len() > 2 {
+                        let _ = writeln!(
+                            warnings,
+                            "Builtin function warning: ignoring extra arguments provided to {} on line {}.",
+                            function_name, line_num
+                        );
+                    }
+                    (*rows, *cols)
+                }
+                [MLtExpr::Basic(MLtValue::Integer(rows))] => (*rows, *rows),
+                _ => Err(TranspilerError(
+                    "Type Deduction Error: ones|zeros expects one or two integer arguments."
+                        .to_string(),
+                ))?,
+            },
             // same size as the left arg
             "expm" | "min" | "max" | "cross" | "abs" | "exp" => {
                 if let Some(expr) = function_params.get(0) {

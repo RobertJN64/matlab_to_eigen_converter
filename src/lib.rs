@@ -16,6 +16,14 @@ mod syntax;
 mod transform;
 mod type_inference;
 
+// Error handling notes:
+// Because transpile_wrap() is called from WASM it must never panic or output to stdout or stderr.
+// 2 output strings are provided instead: the result (C++ code) and warnings, which should contain
+// any errors encountered during the transpiling process. Unrecoverable errors can be returned as a
+// Result<_, TranspilerError> which will be sent to the warnings output. This should be avoided where
+// possible, as the transpiler will then not emit C++ output and is difficult to debug. Warnings should
+// include the C++ line number where possible.
+
 #[wasm_bindgen]
 pub struct TranspilerOutput {
     result: String,

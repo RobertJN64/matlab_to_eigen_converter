@@ -31,8 +31,8 @@ pub enum MLtMatrixAccess {
 
 #[derive(Clone, Debug)]
 pub enum MLtValue {
-    Integer(String), // 1 - we keep this as a string because we don't need to edit it
-    Float(String),   // 0.5 - we keep this as a string because we don't need to edit it
+    Integer(u32), // 1 - converted to an integer for ease of code generation and type checking
+    Float(String), // 0.5 - we keep this as a string because we don't need to edit it
     Matrix(MLtMatrixAccess), // `z`
     StructMatrix(String, MLtMatrixAccess), // constants.z
     InlineMatrix(Vec<MLtExpr>), // [0; 1; z]

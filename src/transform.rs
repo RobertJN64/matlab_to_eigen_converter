@@ -71,10 +71,7 @@ fn transform_matrix_index(value: MLtValue) -> MLtValue {
                 if allowed_function_calls.contains(&fname.as_str()) {
                     value
                 } else {
-                    MLtValue::Matrix(MLtMatrixAccess::MatrixIndex(
-                        fname,
-                        idx.parse().expect("failed to parse integer to int"),
-                    ))
+                    MLtValue::Matrix(MLtMatrixAccess::MatrixIndex(fname, *idx))
                 }
             }
             _ => value,

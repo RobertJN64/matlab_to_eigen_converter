@@ -78,7 +78,7 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFunction> {
                 if s.contains(".") || s.contains("e") {
                     MLtValue::Float(s) // TODO - this fails on 1e-12 or similar
                 } else {
-                    MLtValue::Integer(s)
+                    MLtValue::Integer(s.parse().expect("failed to parse output of int to int"))
                 }
             }),
         mlt_expr
