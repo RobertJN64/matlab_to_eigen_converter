@@ -130,24 +130,22 @@ fn matrix_type(
     })
 }
 
-pub fn lvalue_type(
-    lvalue: &MLtLValue,
+pub fn value_type(
+    value: &MLtValue,
     ti_state: &mut HashMap<String, (u32, u32)>,
     line_num: &mut u32,
     warnings: &mut String,
 ) -> Result<(u32, u32), TranspilerError> {
-    Ok(match lvalue {
-        MLtLValue::Integer(_) | MLtLValue::Float(_) => (1, 1),
-        MLtLValue::Matrix(matrix) => matrix_type("", matrix, ti_state, warnings)?,
-        MLtLValue::StructMatrix(prefix, matrix) => {
+    Ok(match value {
+        MLtValue::Integer(_) | MLtValue::Float(_) => (1, 1),
+        MLtValue::Matrix(matrix) => matrix_type("", matrix, ti_state, warnings)?,
+        MLtValue::StructMatrix(prefix, matrix) => {
             matrix_type(format!("{}.", prefix).as_str(), matrix, ti_state, warnings)?
         }
-        MLtLValue::InlineMatrix(lvalues) => {
-            inline_matrix_type(lvalues, ti_state, line_num, warnings)?
-        }
-        MLtLValue::FunctionCall(function_name, function_params) => match function_name.as_str() {
+        MLtValue::InlineMatrix(values) => inline_matrix_type(values, ti_state, line_num, warnings)?,
+        MLtValue::FunctionCall(function_name, function_params) => match function_name.as_str() {
             "eye" => {
-                if let Some(MLtExpr::Basic(MLtLValue::Integer(n))) = function_params.get(0) {
+                if let Some(MLtExpr::Basic(MLtValue::Integer(n))) = function_params.get(0) {
                     let n = n.parse().map_err(|_| {
                         TranspilerError("Error: argument to eye must be an int.".to_string())
                     })?;
@@ -159,8 +157,8 @@ pub fn lvalue_type(
                 }
             }
             "ones" | "zeros" => {
-                if let Some(MLtExpr::Basic(MLtLValue::Integer(rows))) = function_params.get(0) {
-                    if let Some(MLtExpr::Basic(MLtLValue::Integer(cols))) = function_params.get(1) {
+                if let Some(MLtExpr::Basic(MLtValue::Integer(rows))) = function_params.get(0) {
+                    if let Some(MLtExpr::Basic(MLtValue::Integer(cols))) = function_params.get(1) {
                         let rows = rows.parse().map_err(|_| {
                             TranspilerError(
                                 "Error: argument to ones|zeros must be an int.".to_string(),
@@ -229,7 +227,7 @@ pub fn expr_type(
     warnings: &mut String,
 ) -> Result<(u32, u32), TranspilerError> {
     Ok(match expr {
-        MLtExpr::Basic(mlt_lvalue) => lvalue_type(mlt_lvalue, ti_state, line_num, warnings)?,
+        MLtExpr::Basic(mlt_value) => value_type(mlt_value, ti_state, line_num, warnings)?,
         MLtExpr::Negation(mlt_expr) => expr_type(mlt_expr, ti_state, line_num, warnings)?,
         MLtExpr::Transposed(mlt_expr) => {
             let (cols, rows) = expr_type(mlt_expr, ti_state, line_num, warnings)?;

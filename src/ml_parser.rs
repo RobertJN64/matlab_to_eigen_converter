@@ -52,10 +52,10 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFunction> {
         sident().map(MLtMatrixAccess::Matrix),
     ));
 
-    let mut mlt_lvalue = Recursive::declare();
+    let mut mlt_value = Recursive::declare();
     let mut mlt_expr = Recursive::declare();
 
-    mlt_lvalue.define(choice((
+    mlt_value.define(choice((
         sident()
             .then(
                 mlt_expr
@@ -64,11 +64,11 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFunction> {
                     .collect()
                     .delimited_by(kw("("), kw(")")),
             )
-            .map(|(function_name, params)| MLtLValue::FunctionCall(function_name, params)),
+            .map(|(function_name, params)| MLtValue::FunctionCall(function_name, params)),
         sident()
             .then_ignore(kw("."))
             .then(mlt_matrix.clone())
-            .map(|(struct_name, matrix)| MLtLValue::StructMatrix(struct_name, matrix)),
+            .map(|(struct_name, matrix)| MLtValue::StructMatrix(struct_name, matrix)),
         // TODO - this is grabbing vars that start with e
         one_of("1234567890.e")
             .repeated()
@@ -76,9 +76,9 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFunction> {
             .collect()
             .map(|s: String| {
                 if s.contains(".") || s.contains("e") {
-                    MLtLValue::Float(s) // TODO - this fails on 1e-12 or similar
+                    MLtValue::Float(s) // TODO - this fails on 1e-12 or similar
                 } else {
-                    MLtLValue::Integer(s)
+                    MLtValue::Integer(s)
                 }
             }),
         mlt_expr
@@ -86,8 +86,8 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFunction> {
             .separated_by(kw(";"))
             .collect()
             .delimited_by(kw("["), kw("]"))
-            .map(MLtLValue::InlineMatrix),
-        mlt_matrix.map(MLtLValue::Matrix),
+            .map(MLtValue::InlineMatrix),
+        mlt_matrix.map(MLtValue::Matrix),
     )));
 
     mlt_expr.define({
@@ -96,7 +96,7 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFunction> {
                 .clone()
                 .delimited_by(kw("("), kw(")"))
                 .map(|e| MLtExpr::Parenthesized(Box::new(e))),
-            mlt_lvalue.clone().map(MLtExpr::Basic),
+            mlt_value.clone().map(MLtExpr::Basic),
         ));
 
         let negated_atom = choice((
@@ -163,7 +163,7 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFunction> {
         )
     });
 
-    let mlt_assignment = mlt_lvalue
+    let mlt_assignment = mlt_value
         .then_ignore(kw("="))
         .then(mlt_expr.clone())
         .then_ignore(kw_no_newline(";"));
@@ -171,7 +171,7 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFunction> {
     let mut mlt_statement = Recursive::declare();
 
     mlt_statement.define(choice((
-        mlt_assignment.map(|(lvalue, expr)| MLtStatement::Assignment(lvalue, expr)),
+        mlt_assignment.map(|(value, expr)| MLtStatement::Assignment(value, expr)),
         kw_no_newline("\r\n").to(MLtStatement::NewLine),
         kw_no_newline("\n").to(MLtStatement::NewLine),
         kw_no_newline("persistent")

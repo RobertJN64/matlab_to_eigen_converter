@@ -1,6 +1,6 @@
 use crate::error::TranspilerError;
 use crate::syntax::*;
-use crate::type_inference::{expr_type, inline_matrix_type, lvalue_type};
+use crate::type_inference::{expr_type, inline_matrix_type, value_type};
 use std::collections::HashMap;
 use std::fmt::Write;
 
@@ -63,9 +63,9 @@ fn function_to_dot_function(
         .get(function_name)
         .expect(format!("missing {} in dot_name map", function_name).as_str());
     Ok(match function_params.as_slice() {
-        [MLtExpr::Basic(lvalue)] => format!(
+        [MLtExpr::Basic(value)] => format!(
             "{}.{}",
-            lvalue_to_cpp(lvalue.clone(), ti_state, line_num, warnings)?,
+            value_to_cpp(value.clone(), ti_state, line_num, warnings)?,
             dot_name
         ),
         [expr] => format!(
@@ -89,7 +89,7 @@ fn function_call_to_cpp(
 ) -> Result<String, TranspilerError> {
     Ok(match function_name.as_str() {
         "eye" => {
-            if let Some(MLtExpr::Basic(MLtLValue::Integer(n))) = function_params.get(0) {
+            if let Some(MLtExpr::Basic(MLtValue::Integer(n))) = function_params.get(0) {
                 let n = n.parse().map_err(|_| {
                     TranspilerError("Error: argument to eye must be an int.".to_string())
                 })?;
@@ -101,8 +101,8 @@ fn function_call_to_cpp(
             }
         }
         "zeros" => {
-            if let Some(MLtExpr::Basic(MLtLValue::Integer(rows))) = function_params.get(0) {
-                if let Some(MLtExpr::Basic(MLtLValue::Integer(cols))) = function_params.get(1) {
+            if let Some(MLtExpr::Basic(MLtValue::Integer(rows))) = function_params.get(0) {
+                if let Some(MLtExpr::Basic(MLtValue::Integer(cols))) = function_params.get(1) {
                     let rows = rows.parse().map_err(|_| {
                         TranspilerError("Error: argument to zeros must be an int.".to_string())
                     })?;
@@ -123,8 +123,8 @@ fn function_call_to_cpp(
             }
         }
         "ones" => {
-            if let Some(MLtExpr::Basic(MLtLValue::Integer(rows))) = function_params.get(0) {
-                if let Some(MLtExpr::Basic(MLtLValue::Integer(cols))) = function_params.get(1) {
+            if let Some(MLtExpr::Basic(MLtValue::Integer(rows))) = function_params.get(0) {
+                if let Some(MLtExpr::Basic(MLtValue::Integer(cols))) = function_params.get(1) {
                     let rows = rows.parse().map_err(|_| {
                         TranspilerError("Error: argument to ones must be an int.".to_string())
                     })?;
@@ -213,19 +213,19 @@ fn function_call_to_cpp(
     })
 }
 
-fn lvalue_to_cpp(
-    lvalue: MLtLValue,
+fn value_to_cpp(
+    value: MLtValue,
     ti_state: &mut HashMap<String, (u32, u32)>,
     line_num: &mut u32,
     warnings: &mut String,
 ) -> Result<String, TranspilerError> {
-    match lvalue {
-        MLtLValue::Integer(val) | MLtLValue::Float(val) => Ok(format!("{}", val)),
-        MLtLValue::Matrix(matrix) => Ok(matrix_to_cpp(matrix)),
-        MLtLValue::StructMatrix(struct_name, matrix) => {
+    match value {
+        MLtValue::Integer(val) | MLtValue::Float(val) => Ok(format!("{}", val)),
+        MLtValue::Matrix(matrix) => Ok(matrix_to_cpp(matrix)),
+        MLtValue::StructMatrix(struct_name, matrix) => {
             Ok(format!("{}.{}", struct_name, matrix_to_cpp(matrix)))
         }
-        MLtLValue::InlineMatrix(mlt_exprs) => Ok(format!(
+        MLtValue::InlineMatrix(mlt_exprs) => Ok(format!(
             "({}() << {}).finished()",
             type_to_cpp(inline_matrix_type(
                 &mlt_exprs, ti_state, line_num, warnings
@@ -236,7 +236,7 @@ fn lvalue_to_cpp(
                 .collect::<Result<Vec<_>, _>>()?
                 .join(", ")
         )),
-        MLtLValue::FunctionCall(function_name, function_params) => {
+        MLtValue::FunctionCall(function_name, function_params) => {
             function_call_to_cpp(function_name, function_params, ti_state, line_num, warnings)
         }
     }
@@ -270,7 +270,7 @@ fn expr_to_cpp(
     warnings: &mut String,
 ) -> Result<String, TranspilerError> {
     Ok(match expr {
-        MLtExpr::Basic(mlt_lvalue) => lvalue_to_cpp(mlt_lvalue, ti_state, line_num, warnings)?,
+        MLtExpr::Basic(mlt_value) => value_to_cpp(mlt_value, ti_state, line_num, warnings)?,
         MLtExpr::Negation(mlt_expr) => {
             format!("-{}", expr_to_cpp(*mlt_expr, ti_state, line_num, warnings)?)
         }
@@ -324,7 +324,7 @@ fn expr_to_cpp(
                 }
                 MLtBinOp::CwisePow => {
                     match *mlt_exprr {
-                        MLtExpr::Basic(MLtLValue::Integer(v)) => {
+                        MLtExpr::Basic(MLtValue::Integer(v)) => {
                             if v == "2" {
                                 return Ok(format!(
                                     "{}.cwiseAbs2()",
@@ -361,15 +361,15 @@ fn matrix_access_should_have_type(matrix: &MLtMatrixAccess) -> bool {
     }
 }
 
-fn lvalue_is_simple_matrix(lvalve: &MLtLValue) -> bool {
+fn value_is_simple_matrix(lvalve: &MLtValue) -> bool {
     match lvalve {
-        MLtLValue::Integer(_) | MLtLValue::Float(_) => false,
-        MLtLValue::Matrix(mlt_matrix_access) => matrix_access_should_have_type(mlt_matrix_access),
-        MLtLValue::StructMatrix(_, mlt_matrix_access) => {
+        MLtValue::Integer(_) | MLtValue::Float(_) => false,
+        MLtValue::Matrix(mlt_matrix_access) => matrix_access_should_have_type(mlt_matrix_access),
+        MLtValue::StructMatrix(_, mlt_matrix_access) => {
             matrix_access_should_have_type(mlt_matrix_access)
         }
-        MLtLValue::InlineMatrix(_) => false,
-        MLtLValue::FunctionCall(_, _) => false,
+        MLtValue::InlineMatrix(_) => false,
+        MLtValue::FunctionCall(_, _) => false,
     }
 }
 
@@ -380,9 +380,9 @@ fn generate_output_for_statement(
     warnings: &mut String,
 ) -> Result<String, TranspilerError> {
     Ok(match statement {
-        MLtStatement::Assignment(lvalue, expr) => {
-            let simple_matrix = lvalue_is_simple_matrix(&lvalue); // we don't place types on matrix accesses
-            let left_side_cpp = lvalue_to_cpp(lvalue.clone(), ti_state, line_num, warnings)?;
+        MLtStatement::Assignment(value, expr) => {
+            let simple_matrix = value_is_simple_matrix(&value); // we don't place types on matrix accesses
+            let left_side_cpp = value_to_cpp(value.clone(), ti_state, line_num, warnings)?;
             let right_side_type = expr_type(&expr, ti_state, line_num, warnings)?;
             let right_side_cpp = expr_to_cpp(expr, ti_state, line_num, warnings)?;
 
@@ -396,7 +396,7 @@ fn generate_output_for_statement(
                     right_side_cpp
                 )
             } else {
-                let left_side_type = lvalue_type(&lvalue, ti_state, line_num, warnings)?;
+                let left_side_type = value_type(&value, ti_state, line_num, warnings)?;
                 if left_side_type != right_side_type {
                     let _ = writeln!(
                         warnings,

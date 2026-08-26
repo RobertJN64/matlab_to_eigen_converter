@@ -1,14 +1,16 @@
 use crate::syntax::*;
 
-pub fn transform_matrix_multisegment(lvalue: MLtLValue) -> MLtLValue {
-    match lvalue.clone() {
-        MLtLValue::Matrix(mlt_matrix_access) => {
+// TODO - reject assigning to integer or function
+
+pub fn transform_matrix_multisegment(value: MLtValue) -> MLtValue {
+    match value.clone() {
+        MLtValue::Matrix(mlt_matrix_access) => {
             if let MLtMatrixAccess::MatrixMultiSegment(name, segments) = mlt_matrix_access {
-                MLtLValue::InlineMatrix(
+                MLtValue::InlineMatrix(
                     segments
                         .iter()
                         .map(|mlt_range| {
-                            MLtExpr::Basic(MLtLValue::Matrix(MLtMatrixAccess::MatrixSegment(
+                            MLtExpr::Basic(MLtValue::Matrix(MLtMatrixAccess::MatrixSegment(
                                 name.clone(),
                                 mlt_range.clone(),
                             )))
@@ -16,16 +18,16 @@ pub fn transform_matrix_multisegment(lvalue: MLtLValue) -> MLtLValue {
                         .collect(),
                 )
             } else {
-                lvalue
+                value
             }
         }
-        MLtLValue::StructMatrix(prefix, mlt_matrix_access) => {
+        MLtValue::StructMatrix(prefix, mlt_matrix_access) => {
             if let MLtMatrixAccess::MatrixMultiSegment(name, segments) = mlt_matrix_access {
-                MLtLValue::InlineMatrix(
+                MLtValue::InlineMatrix(
                     segments
                         .iter()
                         .map(|mlt_range| {
-                            MLtExpr::Basic(MLtLValue::StructMatrix(
+                            MLtExpr::Basic(MLtValue::StructMatrix(
                                 prefix.clone(),
                                 MLtMatrixAccess::MatrixSegment(name.clone(), mlt_range.clone()),
                             ))
@@ -33,60 +35,61 @@ pub fn transform_matrix_multisegment(lvalue: MLtLValue) -> MLtLValue {
                         .collect(),
                 )
             } else {
-                lvalue
+                value
             }
         }
-        _ => lvalue,
+        _ => value,
     }
 }
 
-fn transform_pi(lvalue: MLtLValue) -> MLtLValue {
-    match lvalue {
-        MLtLValue::Matrix(MLtMatrixAccess::Matrix(name)) => {
+// TODO - name this better to indicate the internal transforms
+fn transform_pi(value: MLtValue) -> MLtValue {
+    match value {
+        MLtValue::Matrix(MLtMatrixAccess::Matrix(name)) => {
             if name == "pi" {
-                MLtLValue::Matrix(MLtMatrixAccess::Matrix("M_PI".to_string()))
+                MLtValue::Matrix(MLtMatrixAccess::Matrix("M_PI".to_string()))
             } else {
-                MLtLValue::Matrix(MLtMatrixAccess::Matrix(name))
+                MLtValue::Matrix(MLtMatrixAccess::Matrix(name))
             }
         }
-        MLtLValue::InlineMatrix(mlt_exprs) => {
-            MLtLValue::InlineMatrix(mlt_exprs.into_iter().map(transform_expression).collect())
+        MLtValue::InlineMatrix(mlt_exprs) => {
+            MLtValue::InlineMatrix(mlt_exprs.into_iter().map(transform_expression).collect())
         }
-        MLtLValue::FunctionCall(name, mlt_exprs) => MLtLValue::FunctionCall(
+        MLtValue::FunctionCall(name, mlt_exprs) => MLtValue::FunctionCall(
             name,
             mlt_exprs.into_iter().map(transform_expression).collect(),
         ),
-        _ => lvalue,
+        _ => value,
     }
 }
 
-fn transform_matrix_index(lvalue: MLtLValue) -> MLtLValue {
+fn transform_matrix_index(value: MLtValue) -> MLtValue {
     let allowed_function_calls = vec!["ones", "zeros", "eye"];
-    match lvalue.clone() {
-        MLtLValue::FunctionCall(fname, mlt_exprs) => match mlt_exprs.as_slice() {
-            [MLtExpr::Basic(MLtLValue::Integer(idx))] => {
+    match value.clone() {
+        MLtValue::FunctionCall(fname, mlt_exprs) => match mlt_exprs.as_slice() {
+            [MLtExpr::Basic(MLtValue::Integer(idx))] => {
                 if allowed_function_calls.contains(&fname.as_str()) {
-                    lvalue
+                    value
                 } else {
-                    MLtLValue::Matrix(MLtMatrixAccess::MatrixIndex(
+                    MLtValue::Matrix(MLtMatrixAccess::MatrixIndex(
                         fname,
                         idx.parse().expect("failed to parse integer to int"),
                     ))
                 }
             }
-            _ => lvalue,
+            _ => value,
         },
-        _ => lvalue,
+        _ => value,
     }
 }
 
-fn transform_lvalue(lvalue: MLtLValue) -> MLtLValue {
-    transform_matrix_index(transform_pi(transform_matrix_multisegment(lvalue)))
+fn transform_value(value: MLtValue) -> MLtValue {
+    transform_matrix_index(transform_pi(transform_matrix_multisegment(value)))
 }
 
 pub fn transform_expression(expr: MLtExpr) -> MLtExpr {
     match expr {
-        MLtExpr::Basic(mlt_lvalue) => MLtExpr::Basic(transform_lvalue(mlt_lvalue)),
+        MLtExpr::Basic(mlt_value) => MLtExpr::Basic(transform_value(mlt_value)),
         MLtExpr::Negation(mlt_expr) => MLtExpr::Negation(Box::new(transform_expression(*mlt_expr))),
         MLtExpr::Transposed(mlt_expr) => {
             MLtExpr::Transposed(Box::new(transform_expression(*mlt_expr)))
@@ -107,17 +110,17 @@ fn transform_statement(
     persistent_params: &mut Vec<String>,
 ) -> MLtStatement {
     if let MLtStatement::Assignment(
-        MLtLValue::Matrix(MLtMatrixAccess::Matrix(target)),
+        MLtValue::Matrix(MLtMatrixAccess::Matrix(target)),
         MLtExpr::BinOp(dividend_expr, MLtBinOp::Div, r_expr),
     ) = &statement
     {
-        if let MLtExpr::Basic(MLtLValue::Matrix(MLtMatrixAccess::Matrix(ref dividend))) =
+        if let MLtExpr::Basic(MLtValue::Matrix(MLtMatrixAccess::Matrix(ref dividend))) =
             **dividend_expr
         {
-            if let MLtExpr::Basic(MLtLValue::FunctionCall(ref fname, ref args)) = **r_expr {
+            if let MLtExpr::Basic(MLtValue::FunctionCall(ref fname, ref args)) = **r_expr {
                 if fname == "norm"
                     && args.len() == 1
-                    && matches!(&args[0], MLtExpr::Basic(MLtLValue::Matrix(MLtMatrixAccess::Matrix(arg))) if arg == dividend && arg == target)
+                    && matches!(&args[0], MLtExpr::Basic(MLtValue::Matrix(MLtMatrixAccess::Matrix(arg))) if arg == dividend && arg == target)
                 {
                     return MLtStatement::Normalization(target.clone());
                 }
@@ -135,7 +138,7 @@ fn transform_statement(
     }
 
     if let MLtStatement::Assignment(left, right) = statement {
-        return MLtStatement::Assignment(transform_lvalue(left), transform_expression(right));
+        return MLtStatement::Assignment(transform_value(left), transform_expression(right));
     }
 
     if let MLtStatement::Persistent(new_persis_params) = statement.clone() {
