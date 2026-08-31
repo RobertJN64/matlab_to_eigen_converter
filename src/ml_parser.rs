@@ -172,6 +172,10 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, Vec<MLtFile>> {
 
     mlt_statement.define(choice((
         mlt_assignment.map(|(value, expr)| MLtStatement::Assignment(value, expr)),
+        mlt_expr
+            .clone()
+            .then_ignore(kw_no_newline(";"))
+            .map(|expr| MLtStatement::Expression(expr)),
         kw_no_newline("\r\n").to(MLtStatement::NewLine),
         kw_no_newline("\n").to(MLtStatement::NewLine),
         kw_no_newline("persistent")

@@ -16,6 +16,7 @@ pub struct MLtFunction {
 
 #[derive(Clone, Debug)]
 pub enum MLtStatement {
+    Expression(MLtExpr),
     Assignment(MLtValue, MLtExpr),
     Persistent(Vec<String>),                 // list of persistent variables
     IfStatement(MLtExpr, Vec<MLtStatement>), // condition, list of statements

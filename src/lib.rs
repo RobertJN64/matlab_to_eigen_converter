@@ -24,6 +24,8 @@ mod type_inference;
 // possible, as the transpiler will then not emit C++ output and is difficult to debug. Warnings should
 // include the C++ line number where possible.
 
+// TODO - replace linenum system with source line number
+
 #[wasm_bindgen]
 pub struct TranspilerOutput {
     result: String,

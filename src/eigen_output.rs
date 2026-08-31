@@ -368,6 +368,11 @@ fn generate_output_for_statement(
     warnings: &mut String,
 ) -> Result<String, TranspilerError> {
     Ok(match statement {
+        MLtStatement::Expression(expr) => {
+            // call expr_type here to get any type warnings
+            let _ = expr_type(&expr, ti_state, line_num, warnings)?;
+            format!("{};", expr_to_cpp(expr, ti_state, line_num, warnings)?)
+        }
         MLtStatement::Assignment(value, expr) => {
             let simple_matrix = value_is_simple_matrix(&value); // we don't place types on matrix accesses
             let left_side_cpp = value_to_cpp(value.clone(), ti_state, line_num, warnings)?;
