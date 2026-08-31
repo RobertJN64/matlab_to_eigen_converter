@@ -191,7 +191,6 @@ pub fn value_type(
                     ))?
                 }
             }
-            "norm" => (1, 1),
             "diag" => {
                 if let Some(expr) = function_params.get(0) {
                     let (rows, cols) = expr_type(expr, ti_state, line_num, warnings)?;
@@ -203,6 +202,7 @@ pub fn value_type(
                     "Type Deduction Error: diag expects one vector argument.".to_string(),
                 ));
             }
+            "norm" | "isempty" => (1, 1),
             fname => {
                 if let Some((rows, cols)) = ti_state.get(fname) {
                     (*rows, *cols)
@@ -329,6 +329,15 @@ pub fn name_to_type(name: &str) -> Result<(u32, u32), TypeParseError> {
                 TypeParseError(format!("Vector types should be written like Vector#."))
             })?;
             Ok((n, 1))
+        }
+
+        s if let Some(n) = s.strip_prefix("RowVector") => {
+            let n = n.parse().map_err(|_| {
+                TypeParseError(format!(
+                    "RowVector types should be written like RowVector#."
+                ))
+            })?;
+            Ok((1, n))
         }
 
         s if let Some(dims) = s.strip_prefix("Matrix") => {

@@ -25,6 +25,7 @@ mod type_inference;
 // include the C++ line number where possible.
 
 // TODO - replace linenum system with source line number
+// TODO - list of types used at the top
 
 #[wasm_bindgen]
 pub struct TranspilerOutput {

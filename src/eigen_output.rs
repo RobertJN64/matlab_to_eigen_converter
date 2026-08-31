@@ -8,6 +8,7 @@ fn type_to_cpp((rows, cols): (u32, u32)) -> String {
     match (rows, cols) {
         (1, 1) => "float".to_string(),
         (rows, 1) => format!("Vector{}", rows),
+        (1, cols) => format!("RowVector{}", cols),
         (rows, cols) => format!("Matrix{}_{}", rows, cols),
     }
 }
@@ -403,6 +404,7 @@ fn generate_output_for_statement(
                     right_side_cpp
                 )
             } else {
+                // only emit type warnings for left sides that aren't a new simple matrix
                 let left_side_type = value_type(&value, ti_state, line_num, warnings)?;
                 if left_side_type != right_side_type {
                     let _ = writeln!(
@@ -428,6 +430,15 @@ fn generate_output_for_statement(
         }
         MLtStatement::IfStatement(mlt_expr, mlt_statements) => {
             *line_num += 1;
+            // call expr_type here to get any type warnings
+            let condition_type = expr_type(&mlt_expr, ti_state, line_num, warnings)?;
+            if condition_type != (1, 1) {
+                let _ = writeln!(
+                    warnings,
+                    "Conditional type warning: condition type is not boolean on line {}.",
+                    line_num
+                );
+            }
             let text = format!(
                 "if ({}) {{\n{}}}",
                 expr_to_cpp(mlt_expr, ti_state, line_num, warnings)?,
