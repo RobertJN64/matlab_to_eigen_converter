@@ -429,18 +429,17 @@ fn generate_output_for_statement(
             )
         }
         MLtStatement::IfStatement(mlt_expr, mlt_statements) => {
-            *line_num += 1;
             // call expr_type here to get any type warnings
             let condition_type = expr_type(&mlt_expr, ti_state, line_num, warnings)?;
             if condition_type != (1, 1) {
                 let _ = writeln!(
                     warnings,
-                    "Conditional type warning: condition type is not boolean on line {}.",
+                    "Type warning: condition type is not boolean on line {}.",
                     line_num
                 );
             }
             let text = format!(
-                "if ({}) {{\n{}}}",
+                "if ({}) {{{}}}",
                 expr_to_cpp(mlt_expr, ti_state, line_num, warnings)?,
                 // clone ti_state here to prevent types from propagating outside the if statement
                 generate_output_for_statement_list(
@@ -491,7 +490,7 @@ fn generate_output_for_function(
     warnings: &mut String,
 ) -> String {
     // TODO - infer function type from returns, handle multiple returns, etc.
-    format!(
+    let cpp = format!(
         "{} {}({}) {{{}return {};\n}}",
         type_to_cpp(*ti_state.get("_self").unwrap_or(&(0, 0))),
         function.name,
@@ -509,7 +508,9 @@ fn generate_output_for_function(
             .join(", "),
         generate_output_for_statement_list(function.body, ti_state, line_num, warnings),
         function.return_obj // TODO - type check this
-    )
+    );
+    *line_num += 1; // line bump from the return line
+    cpp
 }
 
 pub fn generate_eigen_output(

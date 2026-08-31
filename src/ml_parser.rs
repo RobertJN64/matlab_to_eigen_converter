@@ -11,6 +11,14 @@ fn kw_no_newline<'src>(s: &'static str) -> impl Parser<'src, &'src str, ()> + Cl
     just(s).padded_by(text::inline_whitespace()).ignored()
 }
 
+// allow preceding but not trailing newlines
+fn kw_no_trailing_newline<'src>(s: &'static str) -> impl Parser<'src, &'src str, ()> + Clone {
+    text::whitespace()
+        .ignore_then(just(s))
+        .then_ignore(text::inline_whitespace())
+        .ignored()
+}
+
 // ident to string
 fn sident<'src>() -> impl Parser<'src, &'src str, String> + Clone {
     ident().map(String::from)
@@ -62,7 +70,7 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, Vec<MLtFile>> {
                     .clone()
                     .separated_by(kw(","))
                     .collect()
-                    .delimited_by(kw("("), kw(")")),
+                    .delimited_by(kw("("), kw_no_trailing_newline(")")),
             )
             .map(|(function_name, params)| MLtValue::FunctionCall(function_name, params)),
         sident()
@@ -89,7 +97,7 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, Vec<MLtFile>> {
             .clone()
             .separated_by(kw(";"))
             .collect()
-            .delimited_by(kw("["), kw("]"))
+            .delimited_by(kw("["), kw_no_trailing_newline("]"))
             .map(MLtValue::InlineMatrix),
         mlt_matrix.map(MLtValue::Matrix),
     )));
@@ -98,7 +106,7 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, Vec<MLtFile>> {
         let atom = choice((
             mlt_expr
                 .clone()
-                .delimited_by(kw("("), kw(")"))
+                .delimited_by(kw("("), kw_no_trailing_newline(")"))
                 .map(|e| MLtExpr::Parenthesized(Box::new(e))),
             mlt_value.clone().map(MLtExpr::Basic),
         ));
@@ -113,7 +121,7 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, Vec<MLtFile>> {
         let transposed_atom = choice((
             negated_atom
                 .clone()
-                .then_ignore(kw("'"))
+                .then_ignore(kw_no_trailing_newline("'"))
                 .map(|e| MLtExpr::Transposed(Box::new(e))),
             negated_atom,
         ));
