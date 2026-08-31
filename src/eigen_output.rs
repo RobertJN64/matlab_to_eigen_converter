@@ -367,12 +367,17 @@ fn generate_output_for_statement(
     ti_state: &mut HashMap<String, (u32, u32)>,
     line_num: &mut u32,
     warnings: &mut String,
+    indent: &str,
 ) -> Result<String, TranspilerError> {
     Ok(match statement {
         MLtStatement::Expression(expr) => {
             // call expr_type here to get any type warnings
             let _ = expr_type(&expr, ti_state, line_num, warnings)?;
-            format!("{};", expr_to_cpp(expr, ti_state, line_num, warnings)?)
+            format!(
+                "{}{};",
+                indent,
+                expr_to_cpp(expr, ti_state, line_num, warnings)?
+            )
         }
         MLtStatement::Assignment(value, expr) => {
             let simple_matrix = value_is_simple_matrix(&value); // we don't place types on matrix accesses
@@ -398,7 +403,8 @@ fn generate_output_for_statement(
             if simple_matrix && !ti_state.contains_key(&left_side_cpp) {
                 ti_state.insert(left_side_cpp.clone(), right_side_type);
                 format!(
-                    "{} {} = {};",
+                    "{}{} {} = {};",
+                    indent,
                     type_to_cpp(right_side_type),
                     left_side_cpp,
                     right_side_cpp
@@ -417,14 +423,17 @@ fn generate_output_for_statement(
                         line_num
                     );
                 }
-                format!("{} = {};", left_side_cpp, right_side_cpp)
+                format!("{}{} = {};", indent, left_side_cpp, right_side_cpp)
             }
         }
-        MLtStatement::Normalization(matrix_name) => format!("{}.normalize();", matrix_name),
+        MLtStatement::Normalization(matrix_name) => {
+            format!("{}{}.normalize();", indent, matrix_name)
+        }
         MLtStatement::Persistent(idents) => {
             *line_num += 1;
             format!(
-                "// the following vars are persistent: {}\n",
+                "{}// the following vars are persistent: {}\n",
+                indent,
                 idents.join(", ")
             )
         }
@@ -439,22 +448,25 @@ fn generate_output_for_statement(
                 );
             }
             let text = format!(
-                "if ({}) {{{}}}",
+                "{}if ({}) {{{}{}}}",
+                indent,
                 expr_to_cpp(mlt_expr, ti_state, line_num, warnings)?,
                 // clone ti_state here to prevent types from propagating outside the if statement
                 generate_output_for_statement_list(
                     mlt_statements,
                     &mut ti_state.clone(),
                     line_num,
-                    warnings
-                )
+                    warnings,
+                    &format!("  {}", indent)
+                ),
+                indent
             );
             text
         }
-        MLtStatement::Comment(comment_str) => format!("// {}", comment_str),
+        MLtStatement::Comment(comment_str) => format!("{}// {}", indent, comment_str),
         MLtStatement::Error(error_str) => {
             let _ = writeln!(warnings, "Error parsing line: {}.", error_str);
-            format!("// {}; // line could not be parsed", error_str)
+            format!("{}// {}; // line could not be parsed", indent, error_str)
         }
         MLtStatement::NewLine => {
             *line_num += 1;
@@ -468,17 +480,19 @@ fn generate_output_for_statement_list(
     ti_state: &mut HashMap<String, (u32, u32)>,
     line_num: &mut u32,
     warnings: &mut String,
+    indent: &str,
 ) -> String {
     // TODO - better error context, better error types
     // TODO - better parsing errors
-    // TODO - better indent
     statement_list
         .into_iter()
         .map(|s| {
-            generate_output_for_statement(s, ti_state, line_num, warnings).unwrap_or_else(|e| {
-                let _ = writeln!(warnings, "{}", e.0.to_string());
-                format!("/* {} */", e.0.to_string())
-            })
+            generate_output_for_statement(s, ti_state, line_num, warnings, indent).unwrap_or_else(
+                |e| {
+                    let _ = writeln!(warnings, "{}", e.0.to_string());
+                    format!("/* {} */", e.0.to_string())
+                },
+            )
         })
         .collect()
 }
@@ -506,7 +520,7 @@ fn generate_output_for_function(
             })
             .collect::<Vec<String>>()
             .join(", "),
-        generate_output_for_statement_list(function.body, ti_state, line_num, warnings),
+        generate_output_for_statement_list(function.body, ti_state, line_num, warnings, "  "),
         function.return_obj // TODO - type check this
     );
     *line_num += 1; // line bump from the return line
@@ -524,13 +538,17 @@ pub fn generate_eigen_output(
         &file
             .into_iter()
             .map(|f| match f {
-                MLtFile::Statement(mlt_statement) => {
-                    generate_output_for_statement(mlt_statement, ti_state, &mut line_num, warnings)
-                        .unwrap_or_else(|e| {
-                            let _ = writeln!(warnings, "{}", e.0.to_string());
-                            format!("/* {} */", e.0.to_string())
-                        })
-                }
+                MLtFile::Statement(mlt_statement) => generate_output_for_statement(
+                    mlt_statement,
+                    ti_state,
+                    &mut line_num,
+                    warnings,
+                    "",
+                )
+                .unwrap_or_else(|e| {
+                    let _ = writeln!(warnings, "{}", e.0.to_string());
+                    format!("/* {} */", e.0.to_string())
+                }),
                 MLtFile::Function(mlt_function) => {
                     generate_output_for_function(mlt_function, ti_state, &mut line_num, warnings)
                 }
