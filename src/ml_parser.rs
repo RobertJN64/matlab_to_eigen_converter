@@ -69,14 +69,18 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, Vec<MLtFile>> {
             .then_ignore(kw("."))
             .then(mlt_matrix.clone())
             .map(|(struct_name, matrix)| MLtValue::StructMatrix(struct_name, matrix)),
-        // TODO - this is grabbing vars that start with e
-        one_of("1234567890.e")
-            .repeated()
-            .at_least(1)
-            .collect()
-            .map(|s: String| {
-                if s.contains(".") || s.contains("e") {
-                    MLtValue::Float(s) // TODO - this fails on 1e-12 or similar
+        int(10)
+            .then(just(".").then(digits(10)).or_not())
+            .then(
+                one_of("eE")
+                    .then(one_of("+-").or_not())
+                    .then(digits(10))
+                    .or_not(),
+            )
+            .to_slice()
+            .map(|s: &str| {
+                if s.contains('.') || s.contains('e') || s.contains('E') {
+                    MLtValue::Float(s.to_string())
                 } else {
                     MLtValue::Integer(s.parse().expect("failed to parse output of int to int"))
                 }
