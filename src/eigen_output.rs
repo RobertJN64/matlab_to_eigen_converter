@@ -503,10 +503,31 @@ fn generate_output_for_function(
     line_num: &mut u32,
     warnings: &mut String,
 ) -> String {
-    // TODO - infer function type from returns, handle multiple returns, etc.
+    // clone ti_state here to prevent types from propagating outside the function
+    let mut func_ti_state = ti_state.clone();
+    let body = generate_output_for_statement_list(
+        function.body,
+        &mut func_ti_state,
+        line_num,
+        warnings,
+        "  ",
+    );
+    let return_type = {
+        if let Some((rows, cols)) = ti_state.get(&function.return_obj) {
+            (*rows, *cols)
+        } else {
+            let _ = writeln!(
+                warnings,
+                "Warning: {} was returned but not found in function, can't infer function return type.",
+                function.return_obj
+            );
+            (0, 0)
+        }
+    };
+
     let cpp = format!(
         "{} {}({}) {{{}return {};\n}}",
-        type_to_cpp(*ti_state.get("_self").unwrap_or(&(0, 0))),
+        type_to_cpp(return_type),
         function.name,
         function
             .params
@@ -520,8 +541,8 @@ fn generate_output_for_function(
             })
             .collect::<Vec<String>>()
             .join(", "),
-        generate_output_for_statement_list(function.body, ti_state, line_num, warnings, "  "),
-        function.return_obj // TODO - type check this
+        body,
+        function.return_obj
     );
     *line_num += 1; // line bump from the return line
     cpp

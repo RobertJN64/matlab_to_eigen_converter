@@ -26,6 +26,7 @@ mod type_inference;
 
 // TODO - replace linenum system with source line number
 // TODO - list of types used at the top
+// TODO - generate mex wrappers
 
 #[wasm_bindgen]
 pub struct TranspilerOutput {
@@ -70,7 +71,7 @@ fn transpile(src: &str, types: &str, warnings: &mut String) -> Result<String, Tr
                     ti_state.insert(name.to_string(), matrix_type);
                 }
                 Err(e) => {
-                    writeln!(warnings, "Error parsing <{}>: {}", line, e.0).unwrap();
+                    let _ = writeln!(warnings, "Error parsing <{}>: {}", line, e.0);
                 }
             }
         }
