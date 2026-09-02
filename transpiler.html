@@ -34,6 +34,15 @@
     import { octave } from 'https://esm.sh/@codemirror/legacy-modes/mode/octave' // matlab
     import { StreamLanguage } from 'https://esm.sh/@codemirror/language';
 
+    const typesLang = StreamLanguage.define({
+      token(stream) {
+        if (stream.match(/^#.*/)) return "comment";
+        if (stream.match(/^[A-Za-z_]\w*(?=\s*:)/)) return "variableName";
+        if (stream.match(/^((Row)?Vector\d+|Matrix\d+_\d+|float|double|int|bool)\b/)) return "typeName";
+        stream.next();
+        return null;
+      }
+    });
 
     const srcView = new EditorView({
       extensions: [basicSetup, oneDark, StreamLanguage.define(octave),
@@ -52,9 +61,8 @@
       doc: "% Paste your matlab source code here...\n\n\n\n\n\n\n\n\n"
     });
 
-    // TODO - basic syntax highlighting on these types
     const typeView = new EditorView({
-      extensions: [basicSetup, oneDark,
+      extensions: [basicSetup, oneDark, typesLang,
         EditorView.theme({
           "&": { maxHeight: "500px" },
           ".cm-scroller": { overflow: "auto" },
