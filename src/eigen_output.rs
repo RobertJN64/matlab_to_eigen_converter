@@ -368,6 +368,7 @@ fn generate_output_for_statement(
     line_num: &mut u32,
     warnings: &mut String,
     indent: &str,
+    prev_was_newline: bool,
 ) -> Result<String, TranspilerError> {
     Ok(match statement {
         MLtStatement::Function(function) => {
@@ -467,7 +468,13 @@ fn generate_output_for_statement(
             );
             text
         }
-        MLtStatement::Comment(comment_str) => format!("{}// {}", indent, comment_str),
+        MLtStatement::Comment(comment_str) => {
+            if prev_was_newline {
+                format!("{}// {}", indent, comment_str)
+            } else {
+                format!(" // {}", comment_str)
+            }
+        }
         MLtStatement::Error(error_str) => {
             let _ = writeln!(warnings, "Error parsing line: {}.", error_str);
             format!("{}// {}; // line could not be parsed", indent, error_str)
@@ -490,13 +497,25 @@ fn generate_output_for_statement_list(
     // TODO - better parsing errors
     statement_list
         .into_iter()
-        .map(|s| {
-            generate_output_for_statement(s, ti_state, line_num, warnings, indent).unwrap_or_else(
-                |e| {
-                    let _ = writeln!(warnings, "{}", e.0.to_string());
-                    format!("/* {} */", e.0.to_string())
-                },
+        .scan(true, |prev_was_newline, s| {
+            let was_newline: bool = matches!(s, MLtStatement::NewLine);
+
+            let output = generate_output_for_statement(
+                s,
+                ti_state,
+                line_num,
+                warnings,
+                indent,
+                *prev_was_newline,
             )
+            .unwrap_or_else(|e| {
+                let _ = writeln!(warnings, "{}", e.0);
+                format!("/* {} */", e.0)
+            });
+
+            *prev_was_newline = was_newline;
+
+            Some(output)
         })
         .collect()
 }
@@ -559,19 +578,12 @@ pub fn generate_eigen_output(
 ) -> String {
     let mut line_num = 3;
     let mut output = String::from("#include \"matlab_funcs.h\"\n\n");
-    output.push_str(
-        &file
-            .lines
-            .into_iter()
-            .map(|statement| {
-                generate_output_for_statement(statement, ti_state, &mut line_num, warnings, "")
-                    .unwrap_or_else(|e| {
-                        let _ = writeln!(warnings, "{}", e.0.to_string());
-                        format!("/* {} */", e.0.to_string())
-                    })
-            })
-            .collect::<Vec<String>>()
-            .join(""),
-    );
+    output.push_str(&generate_output_for_statement_list(
+        file.lines,
+        ti_state,
+        &mut line_num,
+        warnings,
+        "",
+    ));
     output
 }
