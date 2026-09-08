@@ -540,7 +540,7 @@ fn generate_output_for_function(
         &mut func_ti_state,
         line_num,
         warnings,
-        &format!(" {}", indent),
+        &format!("  {}", indent),
     );
     let return_type = {
         if let Some((rows, cols)) = ti_state.get(&function.return_obj) {
