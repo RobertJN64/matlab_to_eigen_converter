@@ -373,7 +373,13 @@ fn generate_output_for_statement(
     Ok(match statement {
         MLtStatement::Function(function) => {
             // clone ti_state here to prevent types from propagating outside the function
-            generate_output_for_function(function, &mut ti_state.clone(), line_num, warnings)
+            generate_output_for_function(
+                function,
+                &mut ti_state.clone(),
+                line_num,
+                warnings,
+                indent,
+            )
         }
         MLtStatement::Expression(expr) => {
             // call expr_type here to get any type warnings
@@ -525,6 +531,7 @@ fn generate_output_for_function(
     ti_state: &mut HashMap<String, (u32, u32)>,
     line_num: &mut u32,
     warnings: &mut String,
+    indent: &str,
 ) -> String {
     // clone ti_state here to prevent types from propagating outside the function
     let mut func_ti_state = ti_state.clone();
@@ -533,7 +540,7 @@ fn generate_output_for_function(
         &mut func_ti_state,
         line_num,
         warnings,
-        "  ",
+        &format!(" {}", indent),
     );
     let return_type = {
         if let Some((rows, cols)) = ti_state.get(&function.return_obj) {
@@ -549,7 +556,7 @@ fn generate_output_for_function(
     };
 
     let cpp = format!(
-        "{} {}({}) {{{}return {};\n}}",
+        "{} {}({}) {{{}  {}return {};\n}}",
         type_to_cpp(return_type),
         function.name,
         function
@@ -565,6 +572,7 @@ fn generate_output_for_function(
             .collect::<Vec<String>>()
             .join(", "),
         body,
+        indent,
         function.return_obj
     );
     *line_num += 1; // line bump from the return line
