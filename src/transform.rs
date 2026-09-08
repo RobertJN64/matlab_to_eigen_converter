@@ -1,14 +1,14 @@
 use crate::syntax::*;
 
-pub fn transform_matrix_multisegment(lvalue: MLtLValue) -> MLtLValue {
-    match lvalue.clone() {
-        MLtLValue::Matrix(mlt_matrix_access) => {
+pub fn transform_matrix_multisegment(value: MLtValue) -> MLtValue {
+    match value.clone() {
+        MLtValue::Matrix(mlt_matrix_access) => {
             if let MLtMatrixAccess::MatrixMultiSegment(name, segments) = mlt_matrix_access {
-                MLtLValue::InlineMatrix(
+                MLtValue::InlineMatrix(
                     segments
                         .iter()
                         .map(|mlt_range| {
-                            MLtExpr::Basic(MLtLValue::Matrix(MLtMatrixAccess::MatrixSegment(
+                            MLtExpr::Basic(MLtValue::Matrix(MLtMatrixAccess::MatrixSegment(
                                 name.clone(),
                                 mlt_range.clone(),
                             )))
@@ -16,16 +16,16 @@ pub fn transform_matrix_multisegment(lvalue: MLtLValue) -> MLtLValue {
                         .collect(),
                 )
             } else {
-                lvalue
+                value
             }
         }
-        MLtLValue::StructMatrix(prefix, mlt_matrix_access) => {
+        MLtValue::StructMatrix(prefix, mlt_matrix_access) => {
             if let MLtMatrixAccess::MatrixMultiSegment(name, segments) = mlt_matrix_access {
-                MLtLValue::InlineMatrix(
+                MLtValue::InlineMatrix(
                     segments
                         .iter()
                         .map(|mlt_range| {
-                            MLtExpr::Basic(MLtLValue::StructMatrix(
+                            MLtExpr::Basic(MLtValue::StructMatrix(
                                 prefix.clone(),
                                 MLtMatrixAccess::MatrixSegment(name.clone(), mlt_range.clone()),
                             ))
@@ -33,60 +33,58 @@ pub fn transform_matrix_multisegment(lvalue: MLtLValue) -> MLtLValue {
                         .collect(),
                 )
             } else {
-                lvalue
+                value
             }
         }
-        _ => lvalue,
+        _ => value,
     }
 }
 
-fn transform_pi(lvalue: MLtLValue) -> MLtLValue {
-    match lvalue {
-        MLtLValue::Matrix(MLtMatrixAccess::Matrix(name)) => {
+// TODO - name this better to indicate the internal transforms
+fn transform_pi(value: MLtValue) -> MLtValue {
+    match value {
+        MLtValue::Matrix(MLtMatrixAccess::Matrix(name)) => {
             if name == "pi" {
-                MLtLValue::Matrix(MLtMatrixAccess::Matrix("M_PI".to_string()))
+                MLtValue::Matrix(MLtMatrixAccess::Matrix("M_PI".to_string()))
             } else {
-                MLtLValue::Matrix(MLtMatrixAccess::Matrix(name))
+                MLtValue::Matrix(MLtMatrixAccess::Matrix(name))
             }
         }
-        MLtLValue::InlineMatrix(mlt_exprs) => {
-            MLtLValue::InlineMatrix(mlt_exprs.into_iter().map(transform_expression).collect())
+        MLtValue::InlineMatrix(mlt_exprs) => {
+            MLtValue::InlineMatrix(mlt_exprs.into_iter().map(transform_expression).collect())
         }
-        MLtLValue::FunctionCall(name, mlt_exprs) => MLtLValue::FunctionCall(
+        MLtValue::FunctionCall(name, mlt_exprs) => MLtValue::FunctionCall(
             name,
             mlt_exprs.into_iter().map(transform_expression).collect(),
         ),
-        _ => lvalue,
+        _ => value,
     }
 }
 
-fn transform_matrix_index(lvalue: MLtLValue) -> MLtLValue {
+fn transform_matrix_index(value: MLtValue) -> MLtValue {
     let allowed_function_calls = vec!["ones", "zeros", "eye"];
-    match lvalue.clone() {
-        MLtLValue::FunctionCall(fname, mlt_exprs) => match mlt_exprs.as_slice() {
-            [MLtExpr::Basic(MLtLValue::Integer(idx))] => {
+    match value.clone() {
+        MLtValue::FunctionCall(fname, mlt_exprs) => match mlt_exprs.as_slice() {
+            [MLtExpr::Basic(MLtValue::Integer(idx))] => {
                 if allowed_function_calls.contains(&fname.as_str()) {
-                    lvalue
+                    value
                 } else {
-                    MLtLValue::Matrix(MLtMatrixAccess::MatrixIndex(
-                        fname,
-                        idx.parse().expect("failed to parse integer to int"),
-                    ))
+                    MLtValue::Matrix(MLtMatrixAccess::MatrixIndex(fname, *idx))
                 }
             }
-            _ => lvalue,
+            _ => value,
         },
-        _ => lvalue,
+        _ => value,
     }
 }
 
-fn transform_lvalue(lvalue: MLtLValue) -> MLtLValue {
-    transform_matrix_index(transform_pi(transform_matrix_multisegment(lvalue)))
+fn transform_value(value: MLtValue) -> MLtValue {
+    transform_matrix_index(transform_pi(transform_matrix_multisegment(value)))
 }
 
 pub fn transform_expression(expr: MLtExpr) -> MLtExpr {
     match expr {
-        MLtExpr::Basic(mlt_lvalue) => MLtExpr::Basic(transform_lvalue(mlt_lvalue)),
+        MLtExpr::Basic(mlt_value) => MLtExpr::Basic(transform_value(mlt_value)),
         MLtExpr::Negation(mlt_expr) => MLtExpr::Negation(Box::new(transform_expression(*mlt_expr))),
         MLtExpr::Transposed(mlt_expr) => {
             MLtExpr::Transposed(Box::new(transform_expression(*mlt_expr)))
@@ -106,53 +104,76 @@ fn transform_statement(
     statement: MLtStatement,
     persistent_params: &mut Vec<String>,
 ) -> MLtStatement {
-    if let MLtStatement::Assignment(
-        MLtLValue::Matrix(MLtMatrixAccess::Matrix(target)),
-        MLtExpr::BinOp(dividend_expr, MLtBinOp::Div, r_expr),
-    ) = &statement
-    {
-        if let MLtExpr::Basic(MLtLValue::Matrix(MLtMatrixAccess::Matrix(ref dividend))) =
-            **dividend_expr
-        {
-            if let MLtExpr::Basic(MLtLValue::FunctionCall(ref fname, ref args)) = **r_expr {
-                if fname == "norm"
-                    && args.len() == 1
-                    && matches!(&args[0], MLtExpr::Basic(MLtLValue::Matrix(MLtMatrixAccess::Matrix(arg))) if arg == dividend && arg == target)
+    match statement {
+        MLtStatement::Function(mlt_function) => {
+            MLtStatement::Function(transform_function(mlt_function))
+        }
+        MLtStatement::Expression(mlt_expr) => {
+            MLtStatement::Expression(transform_expression(mlt_expr))
+        }
+        MLtStatement::Assignment(mlt_value, mlt_expr) => {
+            if let MLtValue::Matrix(MLtMatrixAccess::Matrix(target)) = &mlt_value
+                && let MLtExpr::BinOp(dividend_expr, MLtBinOp::Div, r_expr) = &mlt_expr
+            {
+                if let MLtExpr::Basic(MLtValue::Matrix(MLtMatrixAccess::Matrix(ref dividend))) =
+                    **dividend_expr
                 {
-                    return MLtStatement::Normalization(target.clone());
+                    if let MLtExpr::Basic(MLtValue::FunctionCall(ref fname, ref args)) = **r_expr {
+                        if fname == "norm"
+                            && args.len() == 1
+                            && matches!(&args[0], MLtExpr::Basic(MLtValue::Matrix(MLtMatrixAccess::Matrix(arg))) if arg == dividend && arg == target)
+                        {
+                            return MLtStatement::Normalization(target.clone());
+                        }
+                    }
                 }
             }
+            MLtStatement::Assignment(transform_value(mlt_value), transform_expression(mlt_expr))
         }
-    }
-
-    if let MLtStatement::IfStatement(expr, body) = statement {
-        return MLtStatement::IfStatement(
-            transform_expression(expr),
-            body.into_iter()
+        MLtStatement::Persistent(new_persis_params) => {
+            persistent_params.extend(new_persis_params.iter().map(|s| format!("&{}", s)));
+            MLtStatement::Persistent(new_persis_params)
+        }
+        MLtStatement::IfStatement(mlt_expr, mlt_statements) => MLtStatement::IfStatement(
+            transform_expression(mlt_expr),
+            mlt_statements
+                .into_iter()
                 .map(|s| transform_statement(s, persistent_params))
                 .collect(),
-        );
+        ),
+        MLtStatement::Comment(_) => statement,
+        MLtStatement::Error(_) => statement,
+        MLtStatement::NewLine => statement,
+        MLtStatement::Normalization(_) => statement,
     }
-
-    if let MLtStatement::Assignment(left, right) = statement {
-        return MLtStatement::Assignment(transform_lvalue(left), transform_expression(right));
-    }
-
-    if let MLtStatement::Persistent(new_persis_params) = statement.clone() {
-        persistent_params.extend(new_persis_params.into_iter().map(|s| format!("&{}", s)));
-    }
-
-    statement
 }
 
-pub fn transform_ast(mut function: MLtFunction) -> MLtFunction {
+pub fn transform_function(function: MLtFunction) -> MLtFunction {
     let mut persistent_params = vec![];
-    function.body = function
-        .body
-        .into_iter()
-        .map(|s| transform_statement(s, &mut persistent_params))
-        .collect();
-    function.params.extend(persistent_params);
+    let mut new_function = MLtFunction {
+        return_obj: function.return_obj,
+        name: function.name,
+        body: function
+            .body
+            .into_iter()
+            .map(|s| transform_statement(s, &mut persistent_params))
+            .collect(),
+        params: function.params,
+    };
+    new_function.params.extend(persistent_params);
 
-    function
+    new_function
+}
+
+pub fn transform_ast(file: MLtFile) -> MLtFile {
+    // persistent params don't make sense at a top level so just collect them here
+    let mut not_persistent_params = Vec::new();
+
+    MLtFile {
+        lines: file
+            .lines
+            .into_iter()
+            .map(|s| transform_statement(s, &mut not_persistent_params))
+            .collect(),
+    }
 }

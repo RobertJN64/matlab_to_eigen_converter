@@ -1,0 +1,16 @@
+x_est: Vector13
+constantsASTRA.mag: Vector3
+constantsASTRA.Q: Matrix12_12
+constantsASTRA.R: Matrix6_6
+constantsASTRA.g: float
+z: Vector15
+lastZ: Vector15
+dT: float
+GND: bool
+P: Matrix12_12
+HamiltonianProd: Matrix4_4
+quatRot: Matrix3_3
+StateTransitionMat: Matrix12_12
+zetaCross: Matrix3_3
+quatmultiply: RowVector4
+sum: float

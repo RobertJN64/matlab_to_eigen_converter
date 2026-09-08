@@ -1,3 +1,10 @@
+// TODO - unit tests
+
+#[derive(Clone, Debug)]
+pub struct MLtFile {
+    pub lines: Vec<MLtStatement>,
+}
+
 #[derive(Clone, Debug)]
 pub struct MLtFunction {
     pub return_obj: String, // TODO - multiple returns?
@@ -8,7 +15,9 @@ pub struct MLtFunction {
 
 #[derive(Clone, Debug)]
 pub enum MLtStatement {
-    Assignment(MLtLValue, MLtExpr),
+    Function(MLtFunction),
+    Expression(MLtExpr),
+    Assignment(MLtValue, MLtExpr),
     Persistent(Vec<String>),                 // list of persistent variables
     IfStatement(MLtExpr, Vec<MLtStatement>), // condition, list of statements
     Comment(String),
@@ -27,9 +36,9 @@ pub enum MLtMatrixAccess {
 }
 
 #[derive(Clone, Debug)]
-pub enum MLtLValue {
-    Integer(String), // 1 - we keep this as a string because we don't need to edit it
-    Float(String),   // 0.5 - we keep this as a string because we don't need to edit it
+pub enum MLtValue {
+    Integer(u32), // 1 - converted to an integer for ease of code generation and type checking
+    Float(String), // 0.5 - we keep this as a string because we don't need to edit it
     Matrix(MLtMatrixAccess), // `z`
     StructMatrix(String, MLtMatrixAccess), // constants.z
     InlineMatrix(Vec<MLtExpr>), // [0; 1; z]
@@ -38,11 +47,11 @@ pub enum MLtLValue {
 
 #[derive(Clone, Debug)]
 pub enum MLtExpr {
-    Basic(MLtLValue), // lvalue or lvalue'
-    Negation(Box<MLtExpr>),
-    Transposed(Box<MLtExpr>), // transposed will be parenthesized or lvalue
-    Parenthesized(Box<MLtExpr>),
-    BinOp(Box<MLtExpr>, MLtBinOp, Box<MLtExpr>), // "lvalue + lvalue", or sub, mul, div
+    Basic(MLtValue),                             // base pattern, a value
+    Negation(Box<MLtExpr>),                      // -expr
+    Transposed(Box<MLtExpr>),                    // expr'
+    Parenthesized(Box<MLtExpr>),                 // (expr)
+    BinOp(Box<MLtExpr>, MLtBinOp, Box<MLtExpr>), // "expr + expr", or sub, mul, div
 }
 
 #[derive(Clone, Debug)]

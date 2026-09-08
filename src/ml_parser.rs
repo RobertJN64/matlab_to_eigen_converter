@@ -11,12 +11,20 @@ fn kw_no_newline<'src>(s: &'static str) -> impl Parser<'src, &'src str, ()> + Cl
     just(s).padded_by(text::inline_whitespace()).ignored()
 }
 
+// allow preceding but not trailing newlines
+fn kw_no_trailing_newline<'src>(s: &'static str) -> impl Parser<'src, &'src str, ()> + Clone {
+    text::whitespace()
+        .ignore_then(just(s))
+        .then_ignore(text::inline_whitespace())
+        .ignored()
+}
+
 // ident to string
 fn sident<'src>() -> impl Parser<'src, &'src str, String> + Clone {
     ident().map(String::from)
 }
 
-pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFunction> {
+pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFile> {
     let mlt_range = int(10)
         .then_ignore(kw(":"))
         .then(int(10))
@@ -52,51 +60,55 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFunction> {
         sident().map(MLtMatrixAccess::Matrix),
     ));
 
-    let mut mlt_lvalue = Recursive::declare();
+    let mut mlt_value = Recursive::declare();
     let mut mlt_expr = Recursive::declare();
 
-    mlt_lvalue.define(choice((
+    mlt_value.define(choice((
         sident()
             .then(
                 mlt_expr
                     .clone()
                     .separated_by(kw(","))
                     .collect()
-                    .delimited_by(kw("("), kw(")")),
+                    .delimited_by(kw("("), kw_no_trailing_newline(")")),
             )
-            .map(|(function_name, params)| MLtLValue::FunctionCall(function_name, params)),
+            .map(|(function_name, params)| MLtValue::FunctionCall(function_name, params)),
         sident()
             .then_ignore(kw("."))
             .then(mlt_matrix.clone())
-            .map(|(struct_name, matrix)| MLtLValue::StructMatrix(struct_name, matrix)),
-        // TODO - this is grabbing vars that start with e
-        one_of("1234567890.e")
-            .repeated()
-            .at_least(1)
-            .collect()
-            .map(|s: String| {
-                if s.contains(".") || s.contains("e") {
-                    MLtLValue::Float(s) // TODO - this fails on 1e-12 or similar
+            .map(|(struct_name, matrix)| MLtValue::StructMatrix(struct_name, matrix)),
+        int(10)
+            .then(just(".").then(digits(10)).or_not())
+            .then(
+                one_of("eE")
+                    .then(one_of("+-").or_not())
+                    .then(digits(10))
+                    .or_not(),
+            )
+            .to_slice()
+            .map(|s: &str| {
+                if s.contains('.') || s.contains('e') || s.contains('E') {
+                    MLtValue::Float(s.to_string())
                 } else {
-                    MLtLValue::Integer(s)
+                    MLtValue::Integer(s.parse().expect("failed to parse output of int to int"))
                 }
             }),
         mlt_expr
             .clone()
             .separated_by(kw(";"))
             .collect()
-            .delimited_by(kw("["), kw("]"))
-            .map(MLtLValue::InlineMatrix),
-        mlt_matrix.map(MLtLValue::Matrix),
+            .delimited_by(kw("["), kw_no_trailing_newline("]"))
+            .map(MLtValue::InlineMatrix),
+        mlt_matrix.map(MLtValue::Matrix),
     )));
 
     mlt_expr.define({
         let atom = choice((
             mlt_expr
                 .clone()
-                .delimited_by(kw("("), kw(")"))
+                .delimited_by(kw("("), kw_no_trailing_newline(")"))
                 .map(|e| MLtExpr::Parenthesized(Box::new(e))),
-            mlt_lvalue.clone().map(MLtExpr::Basic),
+            mlt_value.clone().map(MLtExpr::Basic),
         ));
 
         let negated_atom = choice((
@@ -109,7 +121,7 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFunction> {
         let transposed_atom = choice((
             negated_atom
                 .clone()
-                .then_ignore(kw("'"))
+                .then_ignore(kw_no_trailing_newline("'"))
                 .map(|e| MLtExpr::Transposed(Box::new(e))),
             negated_atom,
         ));
@@ -163,17 +175,43 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFunction> {
         )
     });
 
-    let mlt_assignment = mlt_lvalue
+    let mlt_assignment = mlt_value
         .then_ignore(kw("="))
         .then(mlt_expr.clone())
         .then_ignore(kw_no_newline(";"));
 
     let mut mlt_statement = Recursive::declare();
 
+    let mlt_function_header = kw_no_newline("function")
+        .ignore_then(sident())
+        .then_ignore(kw("="))
+        .then(sident())
+        .then(
+            sident()
+                .separated_by(kw(","))
+                .collect()
+                .delimited_by(kw("("), kw_no_newline(")")),
+        );
+
+    let mlt_function = mlt_function_header
+        .then(mlt_statement.clone().repeated().collect())
+        .then_ignore(kw_no_newline("end"))
+        .map(|(((return_obj, name), params), body)| MLtFunction {
+            return_obj,
+            name,
+            params,
+            body,
+        });
+
     mlt_statement.define(choice((
-        mlt_assignment.map(|(lvalue, expr)| MLtStatement::Assignment(lvalue, expr)),
         kw_no_newline("\r\n").to(MLtStatement::NewLine),
         kw_no_newline("\n").to(MLtStatement::NewLine),
+        mlt_function.map(|function| MLtStatement::Function(function)),
+        mlt_assignment.map(|(value, expr)| MLtStatement::Assignment(value, expr)),
+        mlt_expr
+            .clone()
+            .then_ignore(kw_no_newline(";"))
+            .map(|expr| MLtStatement::Expression(expr)),
         kw_no_newline("persistent")
             .ignore_then(none_of("\r\n").repeated().collect::<String>())
             .padded()
@@ -189,35 +227,21 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFunction> {
             .at_least(1)
             .ignore_then(none_of("\r\n").repeated().collect::<String>())
             .map(MLtStatement::Comment),
-        none_of(";\n")
-            .repeated()
-            .at_least(1)
-            .collect::<String>()
-            .then_ignore(just(';'))
-            .padded_by(text::inline_whitespace())
-            .map(MLtStatement::Error),
+        // TODO - improve this with a proper recovery strategy
+        just("end").not().ignore_then(
+            none_of("\n")
+                .repeated()
+                .at_least(1)
+                .collect::<String>()
+                .padded_by(text::inline_whitespace())
+                .map(MLtStatement::Error),
+        ),
     )));
 
-    let mlt_function_header = kw("function")
-        .ignore_then(sident())
-        .then_ignore(kw("="))
-        .then(sident())
-        .then(
-            sident()
-                .separated_by(kw(","))
-                .collect()
-                .delimited_by(kw("("), kw_no_newline(")")),
-        );
+    let mlt_file = mlt_statement
+        .repeated()
+        .collect()
+        .map(|lines| MLtFile { lines });
 
-    let mlt_function = mlt_function_header
-        .then(mlt_statement.repeated().collect())
-        .then_ignore(kw("end"))
-        .map(|(((return_obj, name), params), body)| MLtFunction {
-            return_obj,
-            name,
-            params,
-            body,
-        });
-
-    return mlt_function;
+    return mlt_file;
 }
