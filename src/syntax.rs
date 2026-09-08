@@ -1,9 +1,8 @@
 // TODO - unit tests
 
 #[derive(Clone, Debug)]
-pub enum MLtFile {
-    Statement(MLtStatement),
-    Function(MLtFunction),
+pub struct MLtFile {
+    pub lines: Vec<MLtStatement>,
 }
 
 #[derive(Clone, Debug)]
@@ -16,6 +15,7 @@ pub struct MLtFunction {
 
 #[derive(Clone, Debug)]
 pub enum MLtStatement {
+    Function(MLtFunction),
     Expression(MLtExpr),
     Assignment(MLtValue, MLtExpr),
     Persistent(Vec<String>),                 // list of persistent variables

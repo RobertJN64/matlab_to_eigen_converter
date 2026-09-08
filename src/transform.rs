@@ -104,43 +104,48 @@ fn transform_statement(
     statement: MLtStatement,
     persistent_params: &mut Vec<String>,
 ) -> MLtStatement {
-    if let MLtStatement::Assignment(
-        MLtValue::Matrix(MLtMatrixAccess::Matrix(target)),
-        MLtExpr::BinOp(dividend_expr, MLtBinOp::Div, r_expr),
-    ) = &statement
-    {
-        if let MLtExpr::Basic(MLtValue::Matrix(MLtMatrixAccess::Matrix(ref dividend))) =
-            **dividend_expr
-        {
-            if let MLtExpr::Basic(MLtValue::FunctionCall(ref fname, ref args)) = **r_expr {
-                if fname == "norm"
-                    && args.len() == 1
-                    && matches!(&args[0], MLtExpr::Basic(MLtValue::Matrix(MLtMatrixAccess::Matrix(arg))) if arg == dividend && arg == target)
+    match statement {
+        MLtStatement::Function(mlt_function) => {
+            MLtStatement::Function(transform_function(mlt_function))
+        }
+        MLtStatement::Expression(mlt_expr) => {
+            MLtStatement::Expression(transform_expression(mlt_expr))
+        }
+        MLtStatement::Assignment(mlt_value, mlt_expr) => {
+            if let MLtValue::Matrix(MLtMatrixAccess::Matrix(target)) = &mlt_value
+                && let MLtExpr::BinOp(dividend_expr, MLtBinOp::Div, r_expr) = &mlt_expr
+            {
+                if let MLtExpr::Basic(MLtValue::Matrix(MLtMatrixAccess::Matrix(ref dividend))) =
+                    **dividend_expr
                 {
-                    return MLtStatement::Normalization(target.clone());
+                    if let MLtExpr::Basic(MLtValue::FunctionCall(ref fname, ref args)) = **r_expr {
+                        if fname == "norm"
+                            && args.len() == 1
+                            && matches!(&args[0], MLtExpr::Basic(MLtValue::Matrix(MLtMatrixAccess::Matrix(arg))) if arg == dividend && arg == target)
+                        {
+                            return MLtStatement::Normalization(target.clone());
+                        }
+                    }
                 }
             }
+            MLtStatement::Assignment(transform_value(mlt_value), transform_expression(mlt_expr))
         }
-    }
-
-    if let MLtStatement::IfStatement(expr, body) = statement {
-        return MLtStatement::IfStatement(
-            transform_expression(expr),
-            body.into_iter()
+        MLtStatement::Persistent(new_persis_params) => {
+            persistent_params.extend(new_persis_params.iter().map(|s| format!("&{}", s)));
+            MLtStatement::Persistent(new_persis_params)
+        }
+        MLtStatement::IfStatement(mlt_expr, mlt_statements) => MLtStatement::IfStatement(
+            transform_expression(mlt_expr),
+            mlt_statements
+                .into_iter()
                 .map(|s| transform_statement(s, persistent_params))
                 .collect(),
-        );
+        ),
+        MLtStatement::Comment(_) => statement,
+        MLtStatement::Error(_) => statement,
+        MLtStatement::NewLine => statement,
+        MLtStatement::Normalization(_) => statement,
     }
-
-    if let MLtStatement::Assignment(left, right) = statement {
-        return MLtStatement::Assignment(transform_value(left), transform_expression(right));
-    }
-
-    if let MLtStatement::Persistent(new_persis_params) = statement.clone() {
-        persistent_params.extend(new_persis_params.into_iter().map(|s| format!("&{}", s)));
-    }
-
-    statement
 }
 
 pub fn transform_function(function: MLtFunction) -> MLtFunction {
@@ -160,17 +165,15 @@ pub fn transform_function(function: MLtFunction) -> MLtFunction {
     new_function
 }
 
-pub fn transform_ast(file: Vec<MLtFile>) -> Vec<MLtFile> {
+pub fn transform_ast(file: MLtFile) -> MLtFile {
     // persistent params don't make sense at a top level so just collect them here
     let mut not_persistent_params = Vec::new();
 
-    file.into_iter()
-        .map(|f| match f {
-            MLtFile::Statement(mlt_statement) => MLtFile::Statement(transform_statement(
-                mlt_statement,
-                &mut not_persistent_params,
-            )),
-            MLtFile::Function(mlt_function) => MLtFile::Function(transform_function(mlt_function)),
-        })
-        .collect()
+    MLtFile {
+        lines: file
+            .lines
+            .into_iter()
+            .map(|s| transform_statement(s, &mut not_persistent_params))
+            .collect(),
+    }
 }

@@ -370,6 +370,10 @@ fn generate_output_for_statement(
     indent: &str,
 ) -> Result<String, TranspilerError> {
     Ok(match statement {
+        MLtStatement::Function(function) => {
+            // clone ti_state here to prevent types from propagating outside the function
+            generate_output_for_function(function, &mut ti_state.clone(), line_num, warnings)
+        }
         MLtStatement::Expression(expr) => {
             // call expr_type here to get any type warnings
             let _ = expr_type(&expr, ti_state, line_num, warnings)?;
@@ -549,7 +553,7 @@ fn generate_output_for_function(
 }
 
 pub fn generate_eigen_output(
-    file: Vec<MLtFile>,
+    file: MLtFile,
     ti_state: &mut HashMap<String, (u32, u32)>,
     warnings: &mut String,
 ) -> String {
@@ -557,22 +561,14 @@ pub fn generate_eigen_output(
     let mut output = String::from("#include \"matlab_funcs.h\"\n\n");
     output.push_str(
         &file
+            .lines
             .into_iter()
-            .map(|f| match f {
-                MLtFile::Statement(mlt_statement) => generate_output_for_statement(
-                    mlt_statement,
-                    ti_state,
-                    &mut line_num,
-                    warnings,
-                    "",
-                )
-                .unwrap_or_else(|e| {
-                    let _ = writeln!(warnings, "{}", e.0.to_string());
-                    format!("/* {} */", e.0.to_string())
-                }),
-                MLtFile::Function(mlt_function) => {
-                    generate_output_for_function(mlt_function, ti_state, &mut line_num, warnings)
-                }
+            .map(|statement| {
+                generate_output_for_statement(statement, ti_state, &mut line_num, warnings, "")
+                    .unwrap_or_else(|e| {
+                        let _ = writeln!(warnings, "{}", e.0.to_string());
+                        format!("/* {} */", e.0.to_string())
+                    })
             })
             .collect::<Vec<String>>()
             .join(""),

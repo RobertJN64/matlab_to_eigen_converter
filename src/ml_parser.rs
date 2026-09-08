@@ -24,7 +24,7 @@ fn sident<'src>() -> impl Parser<'src, &'src str, String> + Clone {
     ident().map(String::from)
 }
 
-pub fn parser<'src>() -> impl Parser<'src, &'src str, Vec<MLtFile>> {
+pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFile> {
     let mlt_range = int(10)
         .then_ignore(kw(":"))
         .then(int(10))
@@ -182,14 +182,36 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, Vec<MLtFile>> {
 
     let mut mlt_statement = Recursive::declare();
 
+    let mlt_function_header = kw_no_newline("function")
+        .ignore_then(sident())
+        .then_ignore(kw("="))
+        .then(sident())
+        .then(
+            sident()
+                .separated_by(kw(","))
+                .collect()
+                .delimited_by(kw("("), kw_no_newline(")")),
+        );
+
+    let mlt_function = mlt_function_header
+        .then(mlt_statement.clone().repeated().collect())
+        .then_ignore(kw_no_newline("end"))
+        .map(|(((return_obj, name), params), body)| MLtFunction {
+            return_obj,
+            name,
+            params,
+            body,
+        });
+
     mlt_statement.define(choice((
+        kw_no_newline("\r\n").to(MLtStatement::NewLine),
+        kw_no_newline("\n").to(MLtStatement::NewLine),
+        mlt_function.map(|function| MLtStatement::Function(function)),
         mlt_assignment.map(|(value, expr)| MLtStatement::Assignment(value, expr)),
         mlt_expr
             .clone()
             .then_ignore(kw_no_newline(";"))
             .map(|expr| MLtStatement::Expression(expr)),
-        kw_no_newline("\r\n").to(MLtStatement::NewLine),
-        kw_no_newline("\n").to(MLtStatement::NewLine),
         kw_no_newline("persistent")
             .ignore_then(none_of("\r\n").repeated().collect::<String>())
             .padded()
@@ -214,33 +236,10 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, Vec<MLtFile>> {
             .map(MLtStatement::Error),
     )));
 
-    let mlt_function_header = kw_no_newline("function")
-        .ignore_then(sident())
-        .then_ignore(kw("="))
-        .then(sident())
-        .then(
-            sident()
-                .separated_by(kw(","))
-                .collect()
-                .delimited_by(kw("("), kw_no_newline(")")),
-        );
-
-    let mlt_function = mlt_function_header
-        .then(mlt_statement.clone().repeated().collect())
-        .then_ignore(kw_no_newline("end"))
-        .map(|(((return_obj, name), params), body)| MLtFunction {
-            return_obj,
-            name,
-            params,
-            body,
-        });
-
-    let mlt_file = choice((
-        mlt_function.map(MLtFile::Function),
-        mlt_statement.map(MLtFile::Statement),
-    ))
-    .repeated()
-    .collect();
+    let mlt_file = mlt_statement
+        .repeated()
+        .collect()
+        .map(|lines| MLtFile { lines });
 
     return mlt_file;
 }
