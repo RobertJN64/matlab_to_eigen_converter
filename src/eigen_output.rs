@@ -482,8 +482,16 @@ fn generate_output_for_statement(
             }
         }
         MLtStatement::Error(error_str) => {
-            let _ = writeln!(warnings, "Error parsing line: {}.", error_str);
-            format!("{}// {} // line could not be parsed", indent, error_str)
+            let cause = if !error_str.contains(";") {
+                " (missing semicolon)"
+            } else {
+                ""
+            };
+            let _ = writeln!(warnings, "Error parsing line{}: {}.", cause, error_str);
+            format!(
+                "{}// {} // line could not be parsed{}",
+                indent, error_str, cause
+            )
         }
         MLtStatement::NewLine => {
             *line_num += 1;
