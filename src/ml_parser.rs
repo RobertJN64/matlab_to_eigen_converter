@@ -227,13 +227,15 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFile> {
             .at_least(1)
             .ignore_then(none_of("\r\n").repeated().collect::<String>())
             .map(MLtStatement::Comment),
-        none_of(";\n")
-            .repeated()
-            .at_least(1)
-            .collect::<String>()
-            .then_ignore(just(';'))
-            .padded_by(text::inline_whitespace())
-            .map(MLtStatement::Error),
+        // TODO - improve this with a proper recovery strategy
+        just("end").not().ignore_then(
+            none_of("\n")
+                .repeated()
+                .at_least(1)
+                .collect::<String>()
+                .padded_by(text::inline_whitespace())
+                .map(MLtStatement::Error),
+        ),
     )));
 
     let mlt_file = mlt_statement

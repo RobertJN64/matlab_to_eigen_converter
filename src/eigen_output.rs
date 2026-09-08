@@ -477,7 +477,7 @@ fn generate_output_for_statement(
         }
         MLtStatement::Error(error_str) => {
             let _ = writeln!(warnings, "Error parsing line: {}.", error_str);
-            format!("{}// {}; // line could not be parsed", indent, error_str)
+            format!("{}// {} // line could not be parsed", indent, error_str)
         }
         MLtStatement::NewLine => {
             *line_num += 1;
