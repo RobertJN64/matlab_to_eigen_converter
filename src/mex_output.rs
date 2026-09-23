@@ -79,10 +79,12 @@ pub fn generate_mex_wrapper(
 
     let write_outputs = generate_mex_output_write(function_return_obj, ti_state, indent);
 
-    *line_num += 20; // for function excluding read inputs
+    *line_num += 22; // for function excluding read inputs
 
     format!(
         "
+
+#include \"mex.h\"
 
 {indent}void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {{
 {indent}  // Check number of inputs

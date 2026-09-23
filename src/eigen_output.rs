@@ -559,7 +559,7 @@ fn generate_output_for_function(
         gen_mex_wrapper,
     );
     let return_type = {
-        if let Some((rows, cols)) = ti_state.get(&function.return_obj) {
+        if let Some((rows, cols)) = func_ti_state.get(&function.return_obj) {
             (*rows, *cols)
         } else {
             let _ = writeln!(
@@ -576,7 +576,7 @@ fn generate_output_for_function(
             &function.name,
             &function.params,
             &function.return_obj,
-            ti_state,
+            &mut func_ti_state,
             line_num,
             indent,
         )
@@ -592,7 +592,7 @@ fn generate_output_for_function(
             .params
             .into_iter()
             .map(|p| {
-                let type_str = match ti_state.get(p.strip_prefix("&").unwrap_or(&p)) {
+                let type_str = match func_ti_state.get(p.strip_prefix("&").unwrap_or(&p)) {
                     Some(t) => type_to_cpp(*t),
                     None => format!("{}_t", p.strip_prefix("&").unwrap_or(&p)),
                 };
