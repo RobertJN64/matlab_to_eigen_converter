@@ -27,7 +27,6 @@ mod type_inference;
 
 // TODO - replace linenum system with source line number
 // TODO - list of types used at the top
-// TODO - generate mex wrappers
 
 #[wasm_bindgen]
 pub struct TranspilerOutput {

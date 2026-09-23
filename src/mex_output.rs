@@ -5,14 +5,17 @@ fn generate_mex_input_read(
     idx: usize,
     name: &str,
     ti_state: &HashMap<String, (u32, u32)>,
+    line_num: &mut u32,
     indent: &str,
 ) -> String {
     let (rows, cols) = ti_state.get(name).unwrap_or(&(0, 0));
     let type_str = type_to_cpp((*rows, *cols));
 
     let data_copy = if *rows == 1 && *cols == 1 {
+        *line_num += 6;
         format!("{indent}  {type_str} {name} = mxGetPr(prhs[{idx}])[0];")
     } else {
+        *line_num += 10;
         format!(
             "{indent}  {type_str} {name};
 {indent}  double* {name}_ml = mxGetPr(prhs[{idx}]);
@@ -54,6 +57,7 @@ pub fn generate_mex_wrapper(
     function_params: &Vec<String>,
     function_return_obj: &str, // TODO - multiple returns?
     ti_state: &HashMap<String, (u32, u32)>,
+    line_num: &mut u32,
     indent: &str,
 ) -> String {
     let num_inputs = function_params.len();
@@ -70,10 +74,12 @@ pub fn generate_mex_wrapper(
     let read_inputs: String = function_params
         .iter()
         .enumerate()
-        .map(|(idx, name)| generate_mex_input_read(idx, name, ti_state, indent))
+        .map(|(idx, name)| generate_mex_input_read(idx, name, ti_state, line_num, indent))
         .collect();
 
     let write_outputs = generate_mex_output_write(function_return_obj, ti_state, indent);
+
+    *line_num += 20; // for function excluding read inputs
 
     format!(
         "
@@ -91,7 +97,6 @@ pub fn generate_mex_wrapper(
 {read_inputs}
 {indent}  {function_call}
 {write_outputs}
-{indent}}}
-"
+{indent}}}"
     )
 }

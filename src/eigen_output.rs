@@ -577,6 +577,7 @@ fn generate_output_for_function(
             &function.params,
             &function.return_obj,
             ti_state,
+            line_num,
             indent,
         )
     } else {
