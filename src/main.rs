@@ -12,6 +12,7 @@ use type_inference::parse_type;
 
 mod eigen_output;
 mod error;
+mod mex_output;
 mod ml_parser;
 mod syntax;
 mod transform;
@@ -27,7 +28,6 @@ mod type_inference;
 
 // TODO - replace linenum system with source line number
 // TODO - list of types used at the top
-// TODO - generate mex wrappers
 
 fn main() {
     let src = fs::read_to_string(env::args().nth(1).expect("Expected file argument"))
@@ -57,8 +57,9 @@ fn main() {
             let ast = transform_ast(ast);
             let mut cpp_file = File::create("out.cpp").unwrap();
             let mut warnings = String::new();
-            let _ = cpp_file
-                .write_all(generate_eigen_output(ast, &mut ti_state, &mut warnings).as_bytes());
+            let _ = cpp_file.write_all(
+                generate_eigen_output(ast, &mut ti_state, &mut warnings, true).as_bytes(),
+            );
         }
         None => println!("Error while parsing. {:#?}", err),
     }

@@ -1,10 +1,11 @@
 use crate::error::TranspilerError;
+use crate::mex_output::generate_mex_wrapper;
 use crate::syntax::*;
 use crate::type_inference::{expr_type, inline_matrix_type, value_type};
 use std::collections::HashMap;
 use std::fmt::Write;
 
-fn type_to_cpp((rows, cols): (u32, u32)) -> String {
+pub fn type_to_cpp((rows, cols): (u32, u32)) -> String {
     match (rows, cols) {
         (1, 1) => "float".to_string(),
         (rows, 1) => format!("Vector{}", rows),
@@ -369,6 +370,7 @@ fn generate_output_for_statement(
     warnings: &mut String,
     indent: &str,
     prev_was_newline: bool,
+    gen_mex_wrapper: bool,
 ) -> Result<String, TranspilerError> {
     Ok(match statement {
         MLtStatement::Function(function) => {
@@ -379,6 +381,7 @@ fn generate_output_for_statement(
                 line_num,
                 warnings,
                 indent,
+                gen_mex_wrapper,
             )
         }
         MLtStatement::Expression(expr) => {
@@ -468,7 +471,8 @@ fn generate_output_for_statement(
                     &mut ti_state.clone(),
                     line_num,
                     warnings,
-                    &format!("  {}", indent)
+                    &format!("  {}", indent),
+                    gen_mex_wrapper
                 ),
                 indent
             );
@@ -506,6 +510,7 @@ fn generate_output_for_statement_list(
     line_num: &mut u32,
     warnings: &mut String,
     indent: &str,
+    gen_mex_wrapper: bool,
 ) -> String {
     // TODO - better error context, better error types
     // TODO - better parsing errors
@@ -521,6 +526,7 @@ fn generate_output_for_statement_list(
                 warnings,
                 indent,
                 *prev_was_newline,
+                gen_mex_wrapper,
             )
             .unwrap_or_else(|e| {
                 let _ = writeln!(warnings, "{}", e.0);
@@ -540,6 +546,7 @@ fn generate_output_for_function(
     line_num: &mut u32,
     warnings: &mut String,
     indent: &str,
+    gen_mex_wrapper: bool,
 ) -> String {
     // clone ti_state here to prevent types from propagating outside the function
     let mut func_ti_state = ti_state.clone();
@@ -549,9 +556,10 @@ fn generate_output_for_function(
         line_num,
         warnings,
         &format!("  {}", indent),
+        gen_mex_wrapper,
     );
     let return_type = {
-        if let Some((rows, cols)) = ti_state.get(&function.return_obj) {
+        if let Some((rows, cols)) = func_ti_state.get(&function.return_obj) {
             (*rows, *cols)
         } else {
             let _ = writeln!(
@@ -563,15 +571,28 @@ fn generate_output_for_function(
         }
     };
 
+    let mex_output = if gen_mex_wrapper {
+        generate_mex_wrapper(
+            &function.name,
+            &function.params,
+            &function.return_obj,
+            &mut func_ti_state,
+            line_num,
+            indent,
+        )
+    } else {
+        String::new()
+    };
+
     let cpp = format!(
-        "{} {}({}) {{{}  {}return {};\n}}",
+        "{} {}({}) {{{}  {}return {};\n}}{}",
         type_to_cpp(return_type),
         function.name,
         function
             .params
             .into_iter()
             .map(|p| {
-                let type_str = match ti_state.get(p.strip_prefix("&").unwrap_or(&p)) {
+                let type_str = match func_ti_state.get(p.strip_prefix("&").unwrap_or(&p)) {
                     Some(t) => type_to_cpp(*t),
                     None => format!("{}_t", p.strip_prefix("&").unwrap_or(&p)),
                 };
@@ -581,7 +602,8 @@ fn generate_output_for_function(
             .join(", "),
         body,
         indent,
-        function.return_obj
+        function.return_obj,
+        mex_output
     );
     *line_num += 1; // line bump from the return line
     cpp
@@ -591,6 +613,7 @@ pub fn generate_eigen_output(
     file: MLtFile,
     ti_state: &mut HashMap<String, (u32, u32)>,
     warnings: &mut String,
+    gen_mex_wrapper: bool,
 ) -> String {
     let mut line_num = 3;
     let mut output = String::from("#include \"matlab_funcs.h\"\n\n");
@@ -600,6 +623,7 @@ pub fn generate_eigen_output(
         &mut line_num,
         warnings,
         "",
+        gen_mex_wrapper,
     ));
     output
 }
