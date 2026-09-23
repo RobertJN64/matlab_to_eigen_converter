@@ -11,6 +11,7 @@ use type_inference::parse_type;
 
 mod eigen_output;
 mod error;
+mod mex_output;
 mod ml_parser;
 mod syntax;
 mod transform;
@@ -48,10 +49,10 @@ impl TranspilerOutput {
 }
 
 #[wasm_bindgen]
-pub fn transpile_wrap(src: &str, types: &str) -> TranspilerOutput {
+pub fn transpile_wrap(src: &str, types: &str, gen_mex_wrapper: bool) -> TranspilerOutput {
     let mut warnings = String::new();
 
-    transpile(src, types, &mut warnings)
+    transpile(src, types, &mut warnings, gen_mex_wrapper)
         .map(|r| TranspilerOutput {
             result: r,
             warnings: warnings,
@@ -62,7 +63,12 @@ pub fn transpile_wrap(src: &str, types: &str) -> TranspilerOutput {
         })
 }
 
-fn transpile(src: &str, types: &str, warnings: &mut String) -> Result<String, TranspilerError> {
+fn transpile(
+    src: &str,
+    types: &str,
+    warnings: &mut String,
+    gen_mex_wrapper: bool,
+) -> Result<String, TranspilerError> {
     let mut ti_state = HashMap::new();
     for line in types.lines() {
         if !line.trim().is_empty() && !line.trim().starts_with("#") {
@@ -81,7 +87,12 @@ fn transpile(src: &str, types: &str, warnings: &mut String) -> Result<String, Tr
     match ast {
         Some(ast) => {
             let ast = transform_ast(ast);
-            Ok(generate_eigen_output(ast, &mut ti_state, warnings))
+            Ok(generate_eigen_output(
+                ast,
+                &mut ti_state,
+                warnings,
+                gen_mex_wrapper,
+            ))
         }
         None => Err(TranspilerError(format!("Error while parsing. {:#?}", err))),
     }

@@ -127,11 +127,12 @@
     function runTranspile() {
       const ml_src = getSrc();
       const type_src = getTypes();
+      const gen_mex_wrap = document.getElementById("mexWrapChkBox").checked;
       if (!ml_src) return;
 
       if (window.wasmTranspile) {
         try {
-          const result = window.wasmTranspile(ml_src, type_src);
+          const result = window.wasmTranspile(ml_src, type_src, gen_mex_wrap);
           setOut(result.result);
           setErr(result.warnings);
         } catch (e) {
@@ -143,6 +144,8 @@
         setErr('Error loading wasm module.');
       }
     }
+
+    window.runTranspile = runTranspile; // allow checkbox to access function
 
     const srcScroller = srcView.scrollDOM;
     const outScroller = outView.scrollDOM;
@@ -171,6 +174,10 @@
 
       <h3>Types Input</h3>
       <div id="types-editor"></div>
+
+      <br>
+      <input type="checkbox" id="mexWrapChkBox" onclick="runTranspile()">
+      <label for="mexWrapChkBox">Generate Mex Wrappers</label>
     </div>
 
     <div class="pane">
