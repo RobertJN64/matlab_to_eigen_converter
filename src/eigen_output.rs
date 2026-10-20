@@ -208,6 +208,9 @@ fn value_to_cpp(
     line_num: &u32,
     warnings: &mut String,
 ) -> Result<String, TranspilerError> {
+    // when we call type inference again, use this to prevent duplicate warnings
+    let mut not_warnings = String::new();
+
     match value {
         MLtValue::Integer(val) => Ok(format!("{}", val)),
         MLtValue::Float(val) => Ok(format!("{}", val)),
@@ -218,10 +221,14 @@ fn value_to_cpp(
         MLtValue::InlineMatrix(mlt_exprs) => Ok(format!(
             "({}() << {}).finished()",
             type_to_cpp(inline_matrix_type(
-                &mlt_exprs, ti_state, line_num, warnings
+                &mlt_exprs,
+                ti_state,
+                line_num,
+                &mut not_warnings
             )?),
             mlt_exprs
                 .into_iter()
+                .flatten()
                 .map(|v| expr_to_cpp(v, ti_state, line_num, warnings))
                 .collect::<Result<Vec<_>, _>>()?
                 .join(", ")

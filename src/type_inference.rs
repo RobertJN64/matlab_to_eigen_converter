@@ -6,27 +6,58 @@ use crate::syntax::*;
 
 // returns the type (rows, cols) of a matlab expression so the C++ type can be inserted
 
-pub fn inline_matrix_type(
+fn inline_matrix_row_type(
     exprs: &Vec<MLtExpr>,
     ti_state: &HashMap<String, (u32, u32)>,
     line_num: &u32,
     warnings: &mut String,
 ) -> Result<(u32, u32), TranspilerError> {
-    let (mut rows, cols) = expr_type(
-        // .expect() guaranteed by parsing logic
-        exprs
-            .get(0)
-            .expect("Inline matrix must have at least one element"),
-        ti_state,
-        line_num,
-        warnings,
-    )?;
+    let (rows, mut cols) = if let Some(expr) = exprs.get(0) {
+        expr_type(expr, ti_state, line_num, warnings)?
+    } else {
+        let _ = writeln!(
+            warnings,
+            "Inline matrix type warning: empty inline matrix row on line {}.",
+            line_num
+        );
+        (0, 0)
+    };
     for expr in exprs.iter().skip(1) {
         let (new_rows, new_cols) = expr_type(expr, ti_state, line_num, warnings)?;
+        if rows != new_rows {
+            let _ = writeln!(
+                warnings,
+                "Inline matrix type warning: hor concat row count mismatch: {} by {} with {} by {} on line {}.",
+                rows, cols, new_rows, new_cols, line_num
+            );
+        }
+        cols += new_cols;
+    }
+    Ok((rows, cols))
+}
+
+pub fn inline_matrix_type(
+    exprs: &Vec<Vec<MLtExpr>>,
+    ti_state: &HashMap<String, (u32, u32)>,
+    line_num: &u32,
+    warnings: &mut String,
+) -> Result<(u32, u32), TranspilerError> {
+    let (mut rows, cols) = if let Some(row) = exprs.get(0) {
+        inline_matrix_row_type(row, ti_state, line_num, warnings)?
+    } else {
+        let _ = writeln!(
+            warnings,
+            "Inline matrix type warning: empty inline matrix on line {}.",
+            line_num
+        );
+        (0, 0)
+    };
+    for row in exprs.iter().skip(1) {
+        let (new_rows, new_cols) = inline_matrix_row_type(row, ti_state, line_num, warnings)?;
         if cols != new_cols {
             let _ = writeln!(
                 warnings,
-                "Inline matrix type warning: concat: {} by {} with {} by {} on line {}.",
+                "Inline matrix type warning: vert concat column count mismatch: {} by {} with {} by {} on line {}.",
                 rows, cols, new_rows, new_cols, line_num
             );
         }
