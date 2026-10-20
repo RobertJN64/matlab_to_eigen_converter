@@ -37,7 +37,7 @@
     const typesLang = StreamLanguage.define({
       token(stream) {
         if (stream.match(/^#.*/)) return "comment";
-        if (stream.match(/^[A-Za-z_]\w*(?=\s*:)/)) return "variableName";
+        if (stream.match(/^[A-Za-z_][\w.]*(?=\s*:)/)) return "variableName";
         if (stream.match(/^((Row)?Vector\d+|Matrix\d+_\d+|float|double|int|bool)\b/)) return "typeName";
         stream.next();
         return null;

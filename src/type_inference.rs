@@ -67,68 +67,67 @@ pub fn inline_matrix_type(
 }
 
 fn matrix_type(
-    prefix: &str,
     matrix: &MLtMatrixAccess,
     ti_state: &HashMap<String, (u32, u32)>,
     warnings: &mut String,
 ) -> Result<(u32, u32), TranspilerError> {
     Ok(match matrix {
         MLtMatrixAccess::Matrix(name) => {
-            if let Some((rows, cols)) = ti_state.get(format!("{}{}", prefix, name).as_str()) {
+            if let Some((rows, cols)) = ti_state.get(format!("{}", name).as_str()) {
                 (*rows, *cols)
             } else {
-                let _ = writeln!(warnings, "Couldn't find {}{} in types", prefix, name);
+                let _ = writeln!(warnings, "Couldn't find {} in types", name);
                 (0, 0)
             }
         }
         MLtMatrixAccess::MatrixIndex(name, idx) => {
-            if let Some((rows, cols)) = ti_state.get(format!("{}{}", prefix, name).as_str()) {
+            if let Some((rows, cols)) = ti_state.get(format!("{}", name).as_str()) {
                 if *cols == 1 {
                     if *idx > *rows {
                         let _ = writeln!(
                             warnings,
-                            "Matrix index type warning - tried to access index at {} on {}{} which has {} rows",
-                            *idx, prefix, name, *rows
+                            "Matrix index type warning - tried to access index at {} on {} which has {} rows",
+                            *idx, name, *rows
                         );
                     }
                 } else {
                     let _ = writeln!(
                         warnings,
-                        "Matrix index type warning - {}{} is not a vector",
-                        prefix, name
+                        "Matrix index type warning - {} is not a vector",
+                        name
                     );
                 }
             } else {
                 let _ = writeln!(
                     warnings,
-                    "Matrix index type warning - couldn't find {}{} in types so can't perform matrix bounds check",
-                    prefix, name
+                    "Matrix index type warning - couldn't find {} in types so can't perform matrix bounds check",
+                    name
                 );
             }
             (1, 1)
         }
         MLtMatrixAccess::MatrixSegment(name, mlt_range) => {
-            if let Some((rows, cols)) = ti_state.get(format!("{}{}", prefix, name).as_str()) {
+            if let Some((rows, cols)) = ti_state.get(format!("{}", name).as_str()) {
                 if *cols == 1 {
                     if mlt_range.end > *rows {
                         let _ = writeln!(
                             warnings,
-                            "Matrix segment type warning - tried to access segment ending at {} on {}{} which has {} rows",
-                            mlt_range.end, prefix, name, *rows
+                            "Matrix segment type warning - tried to access segment ending at {} on {} which has {} rows",
+                            mlt_range.end, name, *rows
                         );
                     }
                 } else {
                     let _ = writeln!(
                         warnings,
-                        "Matrix segment type warning - {}{} is not a vector",
-                        prefix, name
+                        "Matrix segment type warning - {} is not a vector",
+                        name
                     );
                 }
             } else {
                 let _ = writeln!(
                     warnings,
-                    "Matrix segment type warning - couldn't find {}{} in types so can't perform matrix bounds check",
-                    prefix, name
+                    "Matrix segment type warning - couldn't find {} in types so can't perform matrix bounds check",
+                    name
                 );
             }
             (mlt_range.end - mlt_range.start + 1, 1)
@@ -138,19 +137,19 @@ fn matrix_type(
             panic!("MatrixMultiSegment should be converted to an inline matrix")
         }
         MLtMatrixAccess::MatrixBlock(name, row_range, col_range) => {
-            if let Some((rows, cols)) = ti_state.get(format!("{}{}", prefix, name).as_str()) {
+            if let Some((rows, cols)) = ti_state.get(format!("{}", name).as_str()) {
                 if row_range.end > *rows || col_range.end > *cols {
                     let _ = writeln!(
                         warnings,
-                        "Matrix block type warning - tried to access block ending at {},{} on {}{} which has size {},{}",
-                        row_range.end, col_range.end, prefix, name, *rows, *cols
+                        "Matrix block type warning - tried to access block ending at {},{} on {} which has size {},{}",
+                        row_range.end, col_range.end, name, *rows, *cols
                     );
                 }
             } else {
                 let _ = writeln!(
                     warnings,
-                    "Matrix block type warning - couldn't find {}{} in types so can't perform matrix bounds check",
-                    prefix, name
+                    "Matrix block type warning - couldn't find {} in types so can't perform matrix bounds check",
+                    name
                 );
             }
             (
@@ -169,10 +168,7 @@ pub fn value_type(
 ) -> Result<(u32, u32), TranspilerError> {
     Ok(match value {
         MLtValue::Integer(_) | MLtValue::Float(_) => (1, 1),
-        MLtValue::Matrix(matrix) => matrix_type("", matrix, ti_state, warnings)?,
-        MLtValue::StructMatrix(prefix, matrix) => {
-            matrix_type(format!("{}.", prefix).as_str(), matrix, ti_state, warnings)?
-        }
+        MLtValue::Matrix(matrix) => matrix_type(matrix, ti_state, warnings)?,
         MLtValue::InlineMatrix(values) => inline_matrix_type(values, ti_state, line_num, warnings)?,
         MLtValue::FunctionCall(function_name, function_params) => match function_name.as_str() {
             "eye" => match function_params.as_slice() {

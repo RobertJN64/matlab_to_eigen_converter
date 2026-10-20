@@ -24,6 +24,15 @@ fn sident<'src>() -> impl Parser<'src, &'src str, String> + Clone {
     ident().map(String::from)
 }
 
+// ident.ident.ident to string
+fn sident_dot_sep<'src>() -> impl Parser<'src, &'src str, String> + Clone {
+    ident()
+        .separated_by(just('.'))
+        .at_least(1)
+        .to_slice()
+        .map(String::from)
+}
+
 pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFile> {
     let mlt_range = int(10)
         .then_ignore(kw(":"))
@@ -34,10 +43,10 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFile> {
         });
 
     let mlt_matrix = choice((
-        sident()
+        sident_dot_sep()
             .then(mlt_range.clone().delimited_by(kw("("), kw(")")))
             .map(|(ident, pf)| MLtMatrixAccess::MatrixSegment(ident, pf)),
-        sident()
+        sident_dot_sep()
             .then(
                 mlt_range
                     .clone()
@@ -46,7 +55,7 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFile> {
                     .delimited_by(kw("(["), kw("])")),
             )
             .map(|(ident, pf)| MLtMatrixAccess::MatrixMultiSegment(ident, pf)),
-        sident()
+        sident_dot_sep()
             .then(
                 mlt_range
                     .clone()
@@ -57,14 +66,14 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFile> {
             .map(|(ident, (range_1, range_2))| {
                 MLtMatrixAccess::MatrixBlock(ident, range_1, range_2)
             }),
-        sident().map(MLtMatrixAccess::Matrix),
+        sident_dot_sep().map(MLtMatrixAccess::Matrix),
     ));
 
     let mut mlt_value = Recursive::declare();
     let mut mlt_expr = Recursive::declare();
 
     mlt_value.define(choice((
-        sident()
+        sident_dot_sep()
             .then(
                 mlt_expr
                     .clone()
@@ -73,10 +82,6 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFile> {
                     .delimited_by(kw("("), kw_no_trailing_newline(")")),
             )
             .map(|(function_name, params)| MLtValue::FunctionCall(function_name, params)),
-        sident()
-            .then_ignore(kw("."))
-            .then(mlt_matrix.clone())
-            .map(|(struct_name, matrix)| MLtValue::StructMatrix(struct_name, matrix)),
         int(10)
             .then(just(".").then(digits(10)).or_not())
             .then(
