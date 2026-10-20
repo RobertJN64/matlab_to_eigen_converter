@@ -7,7 +7,7 @@ pub struct MLtFile {
 
 #[derive(Clone, Debug)]
 pub struct MLtFunction {
-    pub return_obj: String, // TODO - multiple returns?
+    pub return_objs: Vec<String>,
     pub name: String,
     pub params: Vec<String>,
     pub body: Vec<MLtStatement>,

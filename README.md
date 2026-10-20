@@ -4,16 +4,15 @@ Converts a matlab function to the equivalent eigen C++ code, including automatic
 
 ### Usage
 
-`cargo run "test.m"`
+Go to https://robertjn64.github.io/matlab_to_eigen_converter/transpiler and enter your matlab code and types.
 
-Reads in `test.m` and produces `out.cpp` and `out.dbg`. `out.cpp` contains the C++ implementation. `out.dbg` contains the abstract syntax tree (useful for debugging). Any parsing or type errors will be printed to the console.
+### Local Version:
 
-To set parameter and function types, edit `src/main.rs`.
+`cargo run "test.m" "types.txt"`
 
-### Limitations
- - Functions must return a single variable
- - The matlab file should start with `function` and end with `end`, with no comments before or after
- - If statements currently don't support else
+Reads in `test.m` and `types.txt` and produces `out.cpp` and `out.dbg`. `out.cpp` contains the C++ implementation. `out.dbg` contains the abstract syntax tree (useful for debugging). Any parsing or type errors will be printed to the console.
+
+Note that the transpiler only supports a subset of the complete matlab syntax and feature set. 
 
 ### AST
 
