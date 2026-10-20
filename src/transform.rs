@@ -8,10 +8,9 @@ pub fn transform_matrix_multisegment(value: MLtValue) -> MLtValue {
                     segments
                         .iter()
                         .map(|mlt_range| {
-                            MLtExpr::Basic(MLtValue::Matrix(MLtMatrixAccess::MatrixSegment(
-                                name.clone(),
-                                mlt_range.clone(),
-                            )))
+                            vec![MLtExpr::Basic(MLtValue::Matrix(
+                                MLtMatrixAccess::MatrixSegment(name.clone(), mlt_range.clone()),
+                            ))]
                         })
                         .collect(),
                 )
@@ -25,10 +24,10 @@ pub fn transform_matrix_multisegment(value: MLtValue) -> MLtValue {
                     segments
                         .iter()
                         .map(|mlt_range| {
-                            MLtExpr::Basic(MLtValue::StructMatrix(
+                            vec![MLtExpr::Basic(MLtValue::StructMatrix(
                                 prefix.clone(),
                                 MLtMatrixAccess::MatrixSegment(name.clone(), mlt_range.clone()),
-                            ))
+                            ))]
                         })
                         .collect(),
                 )
@@ -50,9 +49,12 @@ fn transform_pi(value: MLtValue) -> MLtValue {
                 MLtValue::Matrix(MLtMatrixAccess::Matrix(name))
             }
         }
-        MLtValue::InlineMatrix(mlt_exprs) => {
-            MLtValue::InlineMatrix(mlt_exprs.into_iter().map(transform_expression).collect())
-        }
+        MLtValue::InlineMatrix(mlt_exprs) => MLtValue::InlineMatrix(
+            mlt_exprs
+                .into_iter()
+                .map(|row| row.into_iter().map(transform_expression).collect())
+                .collect(),
+        ),
         MLtValue::FunctionCall(name, mlt_exprs) => MLtValue::FunctionCall(
             name,
             mlt_exprs.into_iter().map(transform_expression).collect(),

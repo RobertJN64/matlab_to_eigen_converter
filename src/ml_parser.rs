@@ -95,6 +95,8 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFile> {
             }),
         mlt_expr
             .clone()
+            .separated_by(kw(","))
+            .collect()
             .separated_by(kw(";"))
             .collect()
             .delimited_by(kw("["), kw_no_trailing_newline("]"))
