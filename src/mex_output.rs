@@ -69,7 +69,7 @@ pub fn generate_mex_wrapper(
     indent: &str,
 ) -> String {
     let num_inputs = function_params.len();
-    let num_outputs = 1; // only support 1 output for now
+    let num_outputs = function_return_objs.len();
 
     let function_call = match function_return_objs.as_slice() {
         [] => format!("{}({});", function_name, function_params.join(", ")),
