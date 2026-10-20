@@ -12,15 +12,16 @@ fn inline_matrix_row_type(
     line_num: &u32,
     warnings: &mut String,
 ) -> Result<(u32, u32), TranspilerError> {
-    let (rows, mut cols) = expr_type(
-        // .expect() guaranteed by parsing logic
-        exprs
-            .get(0)
-            .expect("Inline matrix must have at least one element"),
-        ti_state,
-        line_num,
-        warnings,
-    )?;
+    let (rows, mut cols) = if let Some(expr) = exprs.get(0) {
+        expr_type(expr, ti_state, line_num, warnings)?
+    } else {
+        let _ = writeln!(
+            warnings,
+            "Inline matrix type warning: empty inline matrix row on line {}.",
+            line_num
+        );
+        (0, 0)
+    };
     for expr in exprs.iter().skip(1) {
         let (new_rows, new_cols) = expr_type(expr, ti_state, line_num, warnings)?;
         if rows != new_rows {
@@ -41,15 +42,16 @@ pub fn inline_matrix_type(
     line_num: &u32,
     warnings: &mut String,
 ) -> Result<(u32, u32), TranspilerError> {
-    let (mut rows, cols) = inline_matrix_row_type(
-        // .expect() guaranteed by parsing logic
-        exprs
-            .get(0)
-            .expect("Inline matrix must have at least one element"),
-        ti_state,
-        line_num,
-        warnings,
-    )?;
+    let (mut rows, cols) = if let Some(row) = exprs.get(0) {
+        inline_matrix_row_type(row, ti_state, line_num, warnings)?
+    } else {
+        let _ = writeln!(
+            warnings,
+            "Inline matrix type warning: empty inline matrix on line {}.",
+            line_num
+        );
+        (0, 0)
+    };
     for row in exprs.iter().skip(1) {
         let (new_rows, new_cols) = inline_matrix_row_type(row, ti_state, line_num, warnings)?;
         if cols != new_cols {
