@@ -215,9 +215,6 @@ fn value_to_cpp(
         MLtValue::Integer(val) => Ok(format!("{}", val)),
         MLtValue::Float(val) => Ok(format!("{}", val)),
         MLtValue::Matrix(matrix) => Ok(matrix_to_cpp(matrix)),
-        MLtValue::StructMatrix(struct_name, matrix) => {
-            Ok(format!("{}.{}", struct_name, matrix_to_cpp(matrix)))
-        }
         MLtValue::InlineMatrix(mlt_exprs) => Ok(format!(
             "({}() << {}).finished()",
             type_to_cpp(inline_matrix_type(
@@ -362,9 +359,6 @@ fn value_is_simple_matrix(lvalve: &MLtValue) -> bool {
     match lvalve {
         MLtValue::Integer(_) | MLtValue::Float(_) => false,
         MLtValue::Matrix(mlt_matrix_access) => matrix_access_should_have_type(mlt_matrix_access),
-        MLtValue::StructMatrix(_, mlt_matrix_access) => {
-            matrix_access_should_have_type(mlt_matrix_access)
-        }
         MLtValue::InlineMatrix(_) => false,
         MLtValue::FunctionCall(_, _) => false,
     }
@@ -417,7 +411,7 @@ fn generate_output_for_statement(
                         left_side_cpp, line_num
                     );
                 }
-                MLtValue::Matrix(_) | MLtValue::StructMatrix(_, _) | MLtValue::InlineMatrix(_) => {}
+                MLtValue::Matrix(_) | MLtValue::InlineMatrix(_) => {}
             }
 
             // don't apply type if we already have a type recorded

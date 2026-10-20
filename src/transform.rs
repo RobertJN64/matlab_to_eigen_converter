@@ -18,23 +18,6 @@ pub fn transform_matrix_multisegment(value: MLtValue) -> MLtValue {
                 value
             }
         }
-        MLtValue::StructMatrix(prefix, mlt_matrix_access) => {
-            if let MLtMatrixAccess::MatrixMultiSegment(name, segments) = mlt_matrix_access {
-                MLtValue::InlineMatrix(
-                    segments
-                        .iter()
-                        .map(|mlt_range| {
-                            vec![MLtExpr::Basic(MLtValue::StructMatrix(
-                                prefix.clone(),
-                                MLtMatrixAccess::MatrixSegment(name.clone(), mlt_range.clone()),
-                            ))]
-                        })
-                        .collect(),
-                )
-            } else {
-                value
-            }
-        }
         _ => value,
     }
 }

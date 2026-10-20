@@ -39,9 +39,8 @@ pub enum MLtMatrixAccess {
 pub enum MLtValue {
     Integer(u32), // 1 - converted to an integer for ease of code generation and type checking
     Float(String), // 0.5 - we keep this as a string because we don't need to edit it
-    Matrix(MLtMatrixAccess), // `z`
-    StructMatrix(String, MLtMatrixAccess), // constants.z // TODO - make this properly recursive and reduce special-casing
-    InlineMatrix(Vec<Vec<MLtExpr>>),       // [0, 1, 2; 3, 4, 5; x, y, z]
+    Matrix(MLtMatrixAccess), // `z` or `constants.z`
+    InlineMatrix(Vec<Vec<MLtExpr>>), // [0, 1, 2; 3, 4, 5; x, y, z]
     FunctionCall(String, Vec<MLtExpr>), // telling these from single access is impossible in matlab, list of params
 }
 
