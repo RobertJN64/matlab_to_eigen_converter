@@ -559,24 +559,37 @@ fn generate_output_for_function(
         &format!("  {}", indent),
         gen_mex_wrapper,
     );
-    let return_type = {
-        if let Some((rows, cols)) = func_ti_state.get(&function.return_obj) {
+    let return_types: Vec<_> = function.return_objs.iter().map(|ret_obj| 
+    if let Some((rows, cols)) = func_ti_state.get(ret_obj) {
             (*rows, *cols)
         } else {
             let _ = writeln!(
                 warnings,
                 "Warning: {} was returned but not found in function, can't infer function return type.",
-                function.return_obj
+                ret_obj
             );
             (0, 0)
         }
+    ).collect();
+
+    let return_statement = match function.return_objs.as_slice() {
+        [] => "return;\n".to_string(),
+        [single] => format!("return {single};\n"),
+        many => format!("return {{{}}};\n", many.join(", ")),
     };
 
+    let function_type = match return_types.as_slice() {
+        [] => "void".to_string(),
+        [single] => type_to_cpp(*single),
+        _many => format!("{}_out_t", function.name),
+    };
+    
     let mex_output = if gen_mex_wrapper {
         generate_mex_wrapper(
             &function.name,
             &function.params,
-            &function.return_obj,
+            &function.return_objs,
+            &function_type,
             &mut func_ti_state,
             line_num,
             indent,
@@ -585,9 +598,17 @@ fn generate_output_for_function(
         String::new()
     };
 
+    let struct_prefix = if function.return_objs.len() > 1 {
+        *line_num += 3 + function.return_objs.len() as u32;
+        format!("struct {}_out_t {{\n  {};\n}};\n\n", function.name, function.return_objs.join(";\n  "))
+    } else {
+        "".to_string()
+    };
+    
     let cpp = format!(
-        "{} {}({}) {{{}  {}return {};\n}}{}",
-        type_to_cpp(return_type),
+        "{}{} {}({}) {{{}  {}{}}}{}",
+        struct_prefix,
+        function_type,
         function.name,
         function
             .params
@@ -603,7 +624,7 @@ fn generate_output_for_function(
             .join(", "),
         body,
         indent,
-        function.return_obj,
+        return_statement,
         mex_output
     );
     *line_num += 1; // line bump from the return line

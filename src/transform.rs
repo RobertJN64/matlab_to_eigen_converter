@@ -136,7 +136,7 @@ fn transform_statement(
 pub fn transform_function(function: MLtFunction) -> MLtFunction {
     let mut persistent_params = vec![];
     let mut new_function = MLtFunction {
-        return_obj: function.return_obj,
+        return_objs: function.return_objs,
         name: function.name,
         body: function
             .body

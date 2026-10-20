@@ -189,9 +189,19 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFile> {
 
     let mut mlt_statement = Recursive::declare();
 
+    let mlt_return_statement = choice((
+        sident()
+            .separated_by(kw(","))
+            .collect()
+            .delimited_by(kw("["), kw_no_newline("]")),
+        sident().map(|s| vec![s]),
+    ))
+    .then_ignore(kw("="))
+    .or_not()
+    .map(|vars| vars.unwrap_or_default());
+
     let mlt_function_header = kw_no_newline("function")
-        .ignore_then(sident())
-        .then_ignore(kw("="))
+        .ignore_then(mlt_return_statement)
         .then(sident())
         .then(
             sident()
@@ -203,8 +213,8 @@ pub fn parser<'src>() -> impl Parser<'src, &'src str, MLtFile> {
     let mlt_function = mlt_function_header
         .then(mlt_statement.clone().repeated().collect())
         .then_ignore(kw_no_newline("end"))
-        .map(|(((return_obj, name), params), body)| MLtFunction {
-            return_obj,
+        .map(|(((return_objs, name), params), body)| MLtFunction {
+            return_objs,
             name,
             params,
             body,
