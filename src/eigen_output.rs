@@ -559,18 +559,23 @@ fn generate_output_for_function(
         &format!("  {}", indent),
         gen_mex_wrapper,
     );
-    let return_types: Vec<_> = function.return_objs.iter().map(|ret_obj| 
-    if let Some((rows, cols)) = func_ti_state.get(ret_obj) {
-            (*rows, *cols)
-        } else {
-            let _ = writeln!(
-                warnings,
-                "Warning: {} was returned but not found in function, can't infer function return type.",
-                ret_obj
-            );
-            (0, 0)
-        }
-    ).collect();
+    let return_types: Vec<_> = function
+        .return_objs
+        .iter()
+        .map(|ret_obj| {
+            if let Some((rows, cols)) = func_ti_state.get(ret_obj) {
+                (*rows, *cols)
+            } else {
+                let _ = writeln!(
+                    warnings,
+                    "Warning: {} was returned but not found in function, can't \
+                    infer function return type.",
+                    ret_obj
+                );
+                (0, 0)
+            }
+        })
+        .collect();
 
     let return_statement = match function.return_objs.as_slice() {
         [] => "return;\n".to_string(),
@@ -583,7 +588,7 @@ fn generate_output_for_function(
         [single] => type_to_cpp(*single),
         _many => format!("{}_out_t", function.name),
     };
-    
+
     let mex_output = if gen_mex_wrapper {
         generate_mex_wrapper(
             &function.name,
@@ -600,11 +605,18 @@ fn generate_output_for_function(
 
     let struct_prefix = if function.return_objs.len() > 1 {
         *line_num += 3 + function.return_objs.len() as u32;
-        format!("struct {}_out_t {{\n  {};\n}};\n\n", function.name, function.return_objs.join(";\n  "))
+        let fields = function
+            .return_objs
+            .iter()
+            .zip(return_types)
+            .map(|(ret_obj, ret_type)| format!("{} {}", type_to_cpp(ret_type), ret_obj))
+            .collect::<Vec<_>>()
+            .join(";\n  ");
+        format!("struct {}_out_t {{\n  {};\n}};\n\n", function.name, fields)
     } else {
         "".to_string()
     };
-    
+
     let cpp = format!(
         "{}{} {}({}) {{{}  {}{}}}{}",
         struct_prefix,
